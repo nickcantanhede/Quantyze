@@ -1,1 +1,1 @@
-# Quantyze
+# Quantize
