@@ -32,6 +32,7 @@ from order_book import OrderBook
 from orders import Event, Order
 from price_level import PriceLevel
 
+
 @dataclass
 class MatchingEngine:
     """
@@ -162,7 +163,7 @@ class MatchingEngine:
         fills = []
 
         while not (incoming.is_complete() or level.is_empty()):
-            maker = level.peek_front()
+            maker = level.peek_order()
 
             filled_qty = min(incoming.remaining_qty, maker.remaining_qty)
             incoming.fill(filled_qty)
@@ -172,22 +173,88 @@ class MatchingEngine:
             fills.append(fill_record)
             self.execution_log.append(fill_record)
 
-    def _build_fill_record(self, maker: Order, taker: Order, qty: float,
+            self.metrics["total_filled"] += filled_qty
+            self.metrics['fill_count'] += 1
+
+            if maker.is_complete():
+                level.pop_order()
+
+        return fills
+
+    @staticmethod
+    def _build_fill_record(maker: Order, taker: Order, quantity: float,
                            price: float) -> dict:
         """Return a fill record for a single maker-taker execution."""
 
-    def _calc_slippage(self, expected_price: float, fills: list[dict]) -> float:
+        return {
+            "timestamp": taker.timestamp,
+            "maker_order_id": maker.order_id,
+            "taker_order_id": taker.order_id,
+            "side": taker.side,
+            "filled_qty": quantity,
+            "exec_price": price,
+            "remaining_qty": taker.remaining_qty,
+        }
+
+    @staticmethod
+    def _calc_slippage(expected_price: float, fills: list[dict]) -> float:
         """Return the slippage for a batch of fills."""
+
+        if fills == []:
+            return 0.0
+
+        total_qty = 0.0
+        weighted_price_sum = 0.0
+
+        for fill in fills:
+            filled_qty = fill["filled_qty"]
+            exec_price = fill["exec_price"]
+
+            total_qty += filled_qty
+            weighted_price_sum += filled_qty * exec_price
+
+        if total_qty == 0.0:
+            return 0.0
+
+        vwap = weighted_price_sum / total_qty
+        slippage = vwap - expected_price
+
+        return slippage
 
     def _clean_empty_levels(self) -> None:
         """Remove any empty PriceLevels left behind after matching."""
 
+        best_bid = self.book.best_bid()
+        best_ask = self.book.best_ask()
+
+        while best_bid is not None and best_bid.is_empty():
+            self.book.bids.delete(best_bid.price)
+            best_bid = self.book.best_bid()
+
+        while best_bid is not None and best_bid.is_empty():
+            self.book.asks.delete(best_ask.price)
+            best_ask = self.book.best_ask()
+
     def compute_metrics(self) -> dict:
         """Return the aggregate execution metrics for this engine."""
+
+        metrics_copy = self.metrics.copy()
+
+        if self.execution_log == []:
+            metrics_copy["average_slippage"] = 0.0
+        else:
+            total_slippage = metrics_copy["total_slippage"]
+            fill_count = metrics_copy["fill_count"]
+            metrics_copy["average_slippage"] = total_slippage / fill_count
+
+        return metrics_copy
 
     def __repr__(self) -> str:
         """Return a string representation of this engine for debugging."""
 
-
-
+        return (
+            f"MatchingEngine(total_filled={self.metrics['total_filled']}, "
+            f"fill_count={self.metrics['fill_count']}, "
+            f"cancel_count={self.metrics['cancel_count']})"
+        )
 
