@@ -18,9 +18,10 @@ Copyright Information
 Copyright (c) 2026 Cade McNelly, Nicolas Miranda Cantanhede,
 Sahand Samadirand
 """
-
 from __future__ import annotations
 
+from collections import deque
+from queue import Queue
 from orders import Order
 
 
