@@ -32,6 +32,7 @@ from order_book import OrderBook
 from orders import Event, Order
 from price_level import PriceLevel
 
+
 @dataclass
 class MatchingEngine:
     """
