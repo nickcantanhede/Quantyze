@@ -23,9 +23,9 @@ class DataLoader:
     - self.schema is not None
     """
 
-    filepath: str | None 
-    events: list[Event] 
-    schema: dict 
+    filepath: str | None
+    events: list[Event]
+    schema: dict
 
     def __init__(self, filepath: str | None = None) -> None:
         """Initialize this loader with an optional CSV file path.
