@@ -146,7 +146,6 @@ def run_simulation(stream: EventStream, agent: Agent | None, book: OrderBook) ->
             agent.step(book, last_fill_price)
 
 
-
 def train_model(data_path: str) -> None:
     """Train the optional OrderBookNet model using data from <data_path>.
 
