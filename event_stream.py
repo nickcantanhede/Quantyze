@@ -17,6 +17,7 @@ import time
 from orders import Event
 from matching_engine import MatchingEngine
 
+
 class EventStream:
     """Sequence Event objects and send them to a matching engine.
 
@@ -56,7 +57,7 @@ class EventStream:
         Preconditions:
         - self.running is False
         """
-        self.running = True 
+        self.running = True
         self.run_all()
 
     def stop(self) -> None:

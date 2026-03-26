@@ -31,9 +31,9 @@ class DataLoader:
     - self.schema is not None
     """
 
-    filepath: str | None 
-    events: list[Event] 
-    schema: list[str] 
+    filepath: str | None
+    events: list[Event]
+    schema: list[str]
 
     def __init__(self, filepath: str | None = None) -> None:
         """Initialize this data loader with an optional CSV file path.
@@ -53,35 +53,36 @@ class DataLoader:
         """
         if self.filepath is None:
             raise ValueError("Filepath cannot be None when loading CSV.")
-        
+
         events = []
-        
+
         with open(self.filepath) as file:
             reader = csv.reader(file)
-            try:    
+            try:
                 header = next(reader)  # Assume first row is header
             except StopIteration:
                 self.schema = []  # No header found, set schema to empty
                 self.events = []  # No events to load
                 return []  # Return empty list of events
-            
+
             self.schema = header  # Store column names and types in schema
 
-            for row in reader: 
+            for row in reader:
                 if len(row) != len(header):
                     raise ValueError(f"Row length {len(row)} does not match header length {len(header)}.")
                 else:
                     row_dict = {}
                     for i in range(len(header)):
                         row_dict[header[i]] = row[i]
-                        
+
                     event = self._row_to_event(row_dict)
                     events.append(event)
 
         self.events = events
         return self.events
 
-    def _row_to_event(self, row: dict) -> Event:
+    @staticmethod
+    def _row_to_event(row: dict) -> Event:
         """Convert a single CSV row dictionary into an Event object.
 
         Preconditions:
@@ -110,9 +111,8 @@ class DataLoader:
             raise ValueError(f"Missing required column: {e}")
         except ValueError as e:
             raise ValueError(f"Invalid data format: {e}")
-        
+
         return Event(timestamp, order_id, side, order_type, price, quantity)
-        
 
     def generate_synthetic(self, scenario: str, n: int = 1000) -> list[Event]:
         """Generate and store n synthetic events for the given market scenario.
@@ -129,10 +129,11 @@ class DataLoader:
             self.events = self._high_volatility(n)
         else:
             raise ValueError(f"Unknown scenario: {scenario}")
-        
+
         return self.events
 
-    def _balanced_flow(self, n: int) -> list[Event]:
+    @staticmethod
+    def _balanced_flow(n: int) -> list[Event]:
         """Return n synthetic limit-order events with balanced buy and sell flow.
 
         Preconditions:
@@ -146,12 +147,12 @@ class DataLoader:
 
             if i % 2 == 0:
                 side = 'buy'
-                price = 99.5 
+                price = 99.5
             else:
                 side = 'sell'
                 price = 100.5
 
-            order_id = f"order_{i}" 
+            order_id = f"order_{i}"
             order_type = 'limit'
             quantity = 10.0
 
@@ -160,7 +161,8 @@ class DataLoader:
 
         return synthetic_events
 
-    def _low_liquidity(self, n: int) -> list[Event]:
+    @staticmethod
+    def _low_liquidity(n: int) -> list[Event]:
         """Return n synthetic events representing a thin market with a wide spread.
 
         Preconditions:
@@ -175,10 +177,10 @@ class DataLoader:
             if i % 10 == 0:
                 side = 'buy'
                 price = 98.0
-            else: 
+            else:
                 side = 'sell'
                 price = 102.0
-  
+
             order_id = f"order_{i}"
             order_type = 'limit'
             quantity = 5.0
@@ -188,8 +190,8 @@ class DataLoader:
 
         return synthetic_events
 
-
-    def _high_volatility(self, n: int) -> list[Event]:
+    @staticmethod
+    def _high_volatility(n: int) -> list[Event]:
         """Return n synthetic events with rapidly changing prices and order types.
 
         Preconditions:
@@ -208,7 +210,7 @@ class DataLoader:
                 side = 'sell'
 
             if i % 4 == 0:
-                current_price += 3.0 
+                current_price += 3.0
             elif i % 4 == 1:
                 current_price -= 2.5
             elif i % 4 == 2:
@@ -223,7 +225,7 @@ class DataLoader:
                 order_type = 'limit'
                 price = current_price
 
-            quantity = 5.0 + (i % 4) * 2.0 
+            quantity = 5.0 + (i % 4) * 2.0
 
             order_id = f"volatility_order_{i}"
             event = Event(timestamp, order_id, side, order_type, price, quantity)
@@ -241,14 +243,14 @@ class DataLoader:
         previous_timestamp = None
 
         for event in self.events:
-            if not isinstance(event, Event): # Check if event is an instance of Event
+            if not isinstance(event, Event):  # Check if event is an instance of Event
                 errors.append(f"Invalid event type: {event} instead of Event.")
-            else:  
+            else:
                 if not isinstance(event.order_id, str) or event.order_id.strip() == '':
                     errors.append(f"Invalid order_id: {event.order_id}")
 
                 if event.side not in {'buy', 'sell'}:
-                    errors.append(f"Invalid side: {event.side} in event {event.order_id}")  
+                    errors.append(f"Invalid side: {event.side} in event {event.order_id}")
 
                 if event.order_type not in {'limit', 'market', 'cancel'}:
                     errors.append(f"Invalid order_type: {event.order_type} in event {event.order_id}")
@@ -275,7 +277,7 @@ class DataLoader:
         Each row has the form:
         [timestamp, side, order_type, price, quantity]
 
-        where side is encoded as 1.0 for buy and 0.0 for sell, and
+        where side is encoded as 1.0 for buy and 0.0 for sale, and
         order_type is encoded as 0.0 for limit, 1.0 for market, and
         2.0 for cancel. If an event price is None, it is represented as 0.0.
 
@@ -283,8 +285,8 @@ class DataLoader:
         - self.events != []
         """
         if self.events == []:
-            raise ValueError("No events to convert to feature matrix.")   
-        
+            raise ValueError("No events to convert to feature matrix.")
+
         side_mapping = {'buy': 1.0, 'sell': 0.0}
         order_type_mapping = {'limit': 0.0, 'market': 1.0, 'cancel': 2.0}
 
@@ -305,8 +307,7 @@ class DataLoader:
             feature_matrix.append(features)
 
         return np.array(feature_matrix, dtype=float)
-    
-    
+
     def to_label_vector(self) -> np.ndarray:
         """Convert this loader's events into a NumPy label vector.
         Each label encodes the target action associated with one event or one derived
@@ -336,4 +337,3 @@ class DataLoader:
 
         return np.array(labels, dtype=int)
 
-                

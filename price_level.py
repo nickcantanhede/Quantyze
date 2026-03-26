@@ -19,8 +19,6 @@ Copyright (c) 2026 Cade McNelly, Nicolas Miranda Cantanhede,
 Sahand Samadirand
 """
 from __future__ import annotations
-
-from collections import deque
 from orders import Order
 
 
@@ -136,7 +134,8 @@ class PriceLevel:
     left: PriceLevel | None
     right: PriceLevel | None
 
-    def __init__(self, price: float, orders: Queue | None = None, volume: float = 0.0, parent_price: float = None) -> None:
+    def __init__(self, price: float, orders: Queue | None = None, volume: float = 0.0,
+                 parent_price: float = None) -> None:
         """Initialise a level at ``price``; allocate a new ``Queue`` when ``orders`` is omitted."""
 
         self.price = price
