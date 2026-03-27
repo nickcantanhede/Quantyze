@@ -30,7 +30,6 @@ from __future__ import annotations
 import argparse
 import os
 
-import numpy as np
 import torch
 from flask import Flask
 from torch.utils.data import DataLoader as TorchDataLoader, TensorDataset
@@ -38,23 +37,8 @@ from torch.utils.data import DataLoader as TorchDataLoader, TensorDataset
 from data_loader import DataLoader
 from event_stream import EventStream
 from matching_engine import MatchingEngine
-from neural_net import Agent, Trainer, OrderBookNet, build_features, load_agent
+from neural_net import Agent, Trainer, OrderBookNet, load_agent
 from order_book import OrderBook
-from orders import Event
-
-
-def _label_from_event(event: Event) -> int:
-    """Map event to one of {buy, sell, hold} labels used by the classifier.
-
-    buy  -> 0
-    sell -> 1
-    hold -> 2 (cancel events)
-    """
-    if event.order_type == "cancel":
-        return 2
-    if event.side == "buy":
-        return 0
-    return 1
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,26 +155,11 @@ def train_model(data_path: str) -> None:
     """
 
     data_loader = DataLoader(data_path)
-    events = data_loader.load_csv()
+    data_loader.load_csv()
+    features, labels = data_loader.build_training_dataset()
 
-    if not events:
-        raise ValueError("No training events were loaded from the given data path.")
-
-    # Train on the same snapshot representation used by Agent.observe/build_features
-    # to keep training and inference schemas aligned.
-    book = OrderBook()
-    engine = MatchingEngine(book)
-
-    feature_rows: list[np.ndarray] = []
-    label_rows: list[int] = []
-
-    for event in events:
-        feature_rows.append(build_features(book))
-        label_rows.append(_label_from_event(event))
-        engine.process_event(event)
-
-    features = np.vstack(feature_rows).astype(np.float32)
-    labels = np.array(label_rows, dtype=np.int64)
+    if len(features) < 2:
+        raise ValueError("Need at least two training examples to build train/validation splits.")
 
     feature_tensor = torch.tensor(features, dtype=torch.float32)
     label_tensor = torch.tensor(labels, dtype=torch.long)

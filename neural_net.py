@@ -29,6 +29,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn, optim
 from torch.utils.data import DataLoader
+from data_loader import DataLoader as QuantyzeDataLoader
 
 if TYPE_CHECKING:
     from order_book import OrderBook
@@ -226,41 +227,12 @@ class Agent:
 
 
 def build_features(book: OrderBook) -> np.ndarray:
-    """Standalone 12-D feature vector: best bid/ask, spread, depth[0..4], mid, imbalance."""
+    """Return the shared 12-D inference feature vector from the current book."""
 
-    levels = 4
-    snapshot = book.depth_snapshot(levels=levels)
+    snapshot = book.depth_snapshot(levels=2)
     bids = snapshot.get("bids", []) or []
     asks = snapshot.get("asks", []) or []
-
-    def get_price(side, i):
-        """Get price at ``i`` for the correct ``side``."""
-        if i < len(side) and len(side[i]) >= 1:
-            return float(side[i][0])
-        return 0.0
-
-    def get_vol(side, i):
-        """Get volume at ``i`` for the correct ``side``."""
-        if i < len(side) and len(side[i]) >= 2:
-            return float(side[i][1])
-        return 0.0
-
-    best_bid = get_price(bids, 0)
-    best_ask = get_price(asks, 0)
-    if best_bid > 0.0 and best_ask > 0.0:
-        spread = best_ask - best_bid
-        mid = (best_bid + best_ask) / 2.0
-    else:
-        spread = 0.0
-        mid = 0.0
-    features = [
-        best_bid, best_ask, spread, mid,
-        get_vol(bids, 0), get_vol(asks, 0),
-        get_vol(bids, 1), get_vol(asks, 1),
-        get_vol(bids, 2), get_vol(asks, 2),
-        get_vol(bids, 3), get_vol(asks, 3),
-    ]
-    return np.array(features, dtype=np.float32)
+    return QuantyzeDataLoader._feature_vector_from_levels(bids, asks, 0.0)
 
 
 def load_agent(path: str) -> Agent:
