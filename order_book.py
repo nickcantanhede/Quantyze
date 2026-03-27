@@ -77,9 +77,7 @@ class OrderBook:
         cancellation succeeded.
         """
 
-        if order_id in self.order_index:
-            order = self.order_index[order_id]
-            order.cancel()
+        if order_id not in self.order_index:
             return False
 
         order = self.order_index[order_id]
