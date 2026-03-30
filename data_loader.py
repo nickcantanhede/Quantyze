@@ -19,12 +19,25 @@ import csv
 import os
 import re
 from datetime import date, datetime, timedelta
+from typing import TypedDict
 
 import numpy as np
 
 from matching_engine import MatchingEngine
 from order_book import OrderBook
 from orders import Event
+
+
+class ParsedLobsterRow(TypedDict):
+    """Typed representation of one normalized raw LOBSTER message row."""
+
+    timestamp: datetime
+    event_type: int
+    order_id: str
+    size: float
+    price_int: int
+    direction: int
+    resting_side: str | None
 
 
 class DataLoader:
@@ -95,7 +108,7 @@ class DataLoader:
             return self._load_internal_csv()
 
         trade_date = self._infer_trade_date()
-        return self._load_lobster_messages(first_row, trade_date, detected)
+        return self._load_lobster_messages(trade_date, detected)
 
     @staticmethod
     def _detect_source_format(first_row: list[str]) -> str:
@@ -142,9 +155,7 @@ class DataLoader:
         self._reset_training_cache()
         return self.events
 
-    def _load_lobster_messages(
-        self, first_row: list[str], trade_date: date, detected_format: str
-    ) -> list[Event]:
+    def _load_lobster_messages(self, trade_date: date, detected_format: str) -> list[Event]:
         """Load a raw LOBSTER message file and convert replayable rows into Events.
 
         Types 6 and 7 are preserved as visualization annotations instead of
@@ -162,21 +173,21 @@ class DataLoader:
             data_rows = rows
 
         events = []
-        annotations = []
+        annotation_records = []
         for row_index, row in enumerate(data_rows):
             event = self._lobster_row_to_event(row, trade_date)
             if event is not None:
                 events.append(event)
             annotation = self._lobster_row_to_annotation(row, trade_date, row_index)
             if annotation is not None:
-                annotations.append(annotation)
+                annotation_records.append(annotation)
 
         self.schema = ['Time', 'Event Type', 'Order ID', 'Size', 'Price', 'Direction']
         self.events = events
         self.source_format = 'lobster'
         self.raw_rows = data_rows
         self.raw_orderbook_rows = []
-        self.special_events = annotations
+        self.special_events = annotation_records
         self._reset_training_cache()
         return self.events
 
@@ -233,7 +244,7 @@ class DataLoader:
         return 'sell' if resting_side == 'buy' else 'buy'
 
     @staticmethod
-    def _parse_lobster_row(row: list[str], trade_date: date) -> dict:
+    def _parse_lobster_row(row: list[str], trade_date: date) -> ParsedLobsterRow:
         """Parse one raw LOBSTER row into a normalized dictionary."""
         if len(row) != 6:
             raise ValueError(f"LOBSTER rows must have exactly 6 columns, got {len(row)}.")
@@ -250,19 +261,18 @@ class DataLoader:
 
         timestamp = datetime.combine(trade_date, datetime.min.time()) + timedelta(seconds=time_seconds)
 
-        parsed = {
+        parsed: ParsedLobsterRow = {
             "timestamp": timestamp,
             "event_type": event_type,
             "order_id": order_id,
             "size": size,
             "price_int": price_int,
             "direction": direction,
+            "resting_side": None,
         }
 
         if event_type != 7:
             parsed["resting_side"] = DataLoader._lobster_direction_to_side(direction)
-        else:
-            parsed["resting_side"] = None
 
         return parsed
 
@@ -280,6 +290,9 @@ class DataLoader:
         size = parsed["size"]
         price_int = parsed["price_int"]
         resting_side = parsed["resting_side"]
+
+        if event_type in {1, 2, 3, 4, 5} and resting_side is None:
+            raise ValueError(f"LOBSTER event type {event_type} is missing a resting side.")
 
         if event_type == 1:
             event = Event(timestamp, order_id, resting_side, 'limit', price_int / 10000, size)

@@ -190,7 +190,8 @@ class Agent:
                     RuntimeWarning,
                 )
 
-    def observe(self, book: OrderBook) -> np.ndarray:
+    @staticmethod
+    def observe(book: OrderBook) -> np.ndarray:
         """Extract the feature vector (spread, depth bands, mid, imbalance, etc.)."""
 
         return build_features(book)
