@@ -28,7 +28,6 @@ Sahand Samadirand
 from __future__ import annotations
 
 import argparse
-import os
 
 import torch
 from flask import Flask
@@ -122,7 +121,7 @@ def build_system(args: argparse.Namespace) -> tuple[OrderBook, MatchingEngine, E
     if args.train:
         agent = None
     else:
-        agent = load_agent("model.pt") if os.path.exists("model.pt") else Agent()
+        agent = load_agent("model.pt")
 
     return book, engine, stream, agent
 
@@ -151,12 +150,14 @@ def train_model(data_path: str) -> None:
     """Train the optional OrderBookNet model using data from <data_path>.
 
     This function loads training data, constructs the neural-network training
-    objects, and saves model weights for later inference.
+    objects, exports the derived training dataset, and saves model weights for
+    later inference.
     """
 
     data_loader = DataLoader(data_path)
     data_loader.load_csv()
     features, labels = data_loader.build_training_dataset()
+    data_loader.export_training_csv("training_data.csv")
 
     if len(features) < 2:
         raise ValueError("Need at least two training examples to build train/validation splits.")

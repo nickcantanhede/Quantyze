@@ -165,6 +165,7 @@ class Agent:
     balance: float
     position: float
     pnl_log: list[float]
+    model_loaded: bool
 
     def __init__(self, model_path: str = "model.pt") -> None:
         """Construct network, load ``model_path`` if present, init balance/position/pnl_log."""
@@ -175,6 +176,7 @@ class Agent:
         self.position = 0.0
         self.pnl_log = []
         self._model_path = model_path
+        self.model_loaded = False
 
         self.model.eval()
 
@@ -183,6 +185,7 @@ class Agent:
                 state = torch.load(model_path, map_location=torch.device("cpu"))
                 self.model.load_state_dict(state)
                 self.model.eval()
+                self.model_loaded = True
             except (EOFError, OSError, RuntimeError, ValueError) as exc:
                 warnings.warn(
                     f"Could not load checkpoint from {model_path!r}; using an untrained model instead. "
@@ -246,7 +249,18 @@ def build_features(book: OrderBook) -> np.ndarray:
     return QuantyzeDataLoader._feature_vector_from_levels(bids, asks, 0.0)
 
 
-def load_agent(path: str) -> Agent:
+def load_agent(path: str) -> Agent | None:
     """Construct Agent and load weights from ``path`` for inference."""
 
-    return Agent(model_path=path)
+    if not os.path.exists(path):
+        return None
+
+    if os.path.getsize(path) == 0:
+        return None
+
+    agent = Agent(model_path=path)
+
+    if not agent.model_loaded:
+        return None
+
+    return agent
