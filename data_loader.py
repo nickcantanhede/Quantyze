@@ -189,7 +189,7 @@ class DataLoader:
             raise ValueError("Filepath cannot be None when loading CSV.")
 
         with open(self.filepath, newline='') as file:
-            rows = [row for row in csv.reader(file)]
+            rows = list(csv.reader(file))
 
         if detected_format == 'lobster_header':
             data_rows = rows[1:]
@@ -697,8 +697,6 @@ class DataLoader:
             for feature_row, label in zip(features, labels):
                 writer.writerow(feature_row.tolist() + [int(label)])
 
-
-
     def get_visualization_annotations(self) -> list[dict]:
         """Return a copy of the LOBSTER-specific visualization annotations."""
         return [annotation.copy() for annotation in self.special_events]
@@ -855,6 +853,15 @@ class DataLoader:
         ], dtype=np.float32)
 
     @staticmethod
+    def feature_vector_from_levels(
+        bids: list[tuple[float, float]],
+        asks: list[tuple[float, float]],
+        event_side: float,
+    ) -> np.ndarray:
+        """Return the public base feature vector used by training and inference."""
+        return DataLoader._feature_vector_from_levels(bids, asks, event_side)
+
+    @staticmethod
     def _augment_feature_vector(
         base_features: np.ndarray,
         previous_base_features: np.ndarray | None,
@@ -870,7 +877,15 @@ class DataLoader:
                 base_features[6] - previous_base_features[6],
             ], dtype=np.float32)
 
-        return np.concatenate((base_features, history_features), dtype=np.float32)
+        return np.concatenate((base_features, history_features)).astype(np.float32)
+
+    @staticmethod
+    def augment_feature_vector(
+        base_features: np.ndarray,
+        previous_base_features: np.ndarray | None,
+    ) -> np.ndarray:
+        """Return the public history-augmented feature vector used by inference."""
+        return DataLoader._augment_feature_vector(base_features, previous_base_features)
 
     @staticmethod
     def _labels_from_mid_sequence(mids: list[float]) -> np.ndarray:
@@ -898,3 +913,23 @@ class DataLoader:
         """Clear any cached training dataset arrays."""
         self._training_features = None
         self._training_labels = None
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': [
+            'csv', 'os', 're', 'datetime', 'typing', 'numpy',
+            'matching_engine', 'order_book', 'orders', 'doctest', 'python_ta'
+        ],
+        'disable': [
+            'too-many-instance-attributes',
+            'naming-convention-violation',
+            'E9998'
+        ],
+        'max-line-length': 120
+    })

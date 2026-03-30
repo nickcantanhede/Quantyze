@@ -21,8 +21,9 @@ Copyright (c) 2026 Cade McNelly, Nicolas Miranda Cantanhede,
 Sahand Samadirand
 """
 
-from price_level import PriceLevel
 from dataclasses import dataclass
+
+from price_level import PriceLevel
 
 
 @dataclass()
@@ -244,3 +245,17 @@ class BookTree:
             root_price = self.root.price
 
         return f"BookTree(side={self.side!r}, size={self.size}, root={root_price})"
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': ['price_level', 'dataclasses', 'doctest', 'python_ta'],
+        'allowed-io': [],
+        'disable': ['too-many-nested-blocks'],
+        'max-line-length': 120
+    })

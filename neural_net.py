@@ -30,6 +30,7 @@ import numpy as np
 import torch
 from torch import Tensor, nn, optim
 from torch.utils.data import DataLoader
+
 from data_loader import DataLoader as QuantyzeDataLoader
 
 if TYPE_CHECKING:
@@ -168,7 +169,7 @@ class Trainer:
         best_val = float("inf")
         best_state: dict[str, Tensor] | None = None
 
-        for epoch in range(epochs):
+        for _ in range(epochs):
             train_loss = self.train_epoch(train_loader)
             val_loss = self.validate(val_loader)
             self.history["train_loss"].append(train_loss)
@@ -180,8 +181,6 @@ class Trainer:
                     key: value.detach().cpu().clone()
                     for key, value in self.model.state_dict().items()
                 }
-
-            print(f"Epoch {epoch + 1:03d}/{epochs} | train={train_loss:.6f} | val={val_loss:.6f}")
 
         if best_state is not None:
             self.model.load_state_dict(best_state)
@@ -204,7 +203,7 @@ class Trainer:
     def load(self, path: str = "model.pt") -> None:
         """Load weights from ``path`` into ``model`` and set eval mode."""
 
-        state, _, _, _ = _load_checkpoint_payload(path, self.device)
+        state = _load_checkpoint_payload(path, self.device)[0]
         self.model.load_state_dict(state)
         self.model.eval()
 
@@ -221,6 +220,7 @@ class Agent:
     feature_mean: np.ndarray | None
     feature_std: np.ndarray | None
     previous_base_features: np.ndarray | None
+    _model_path: str
 
     def __init__(self, model_path: str = "model.pt") -> None:
         """Construct network, load ``model_path`` if present, init balance/position/pnl_log."""
@@ -265,7 +265,7 @@ class Agent:
         """Extract the shared inference feature vector including one-step history."""
 
         base_features = build_base_features(book)
-        features = QuantyzeDataLoader._augment_feature_vector(
+        features = QuantyzeDataLoader.augment_feature_vector(
             base_features,
             self.previous_base_features
         )
@@ -320,7 +320,7 @@ def build_base_features(book: OrderBook) -> np.ndarray:
     snapshot = book.depth_snapshot(levels=2)
     bids = snapshot.get("bids", []) or []
     asks = snapshot.get("asks", []) or []
-    return QuantyzeDataLoader._feature_vector_from_levels(bids, asks, 0.0)
+    return QuantyzeDataLoader.feature_vector_from_levels(bids, asks, 0.0)
 
 
 def build_features(
@@ -330,7 +330,7 @@ def build_features(
     """Return the shared history-aware inference vector from the current book."""
 
     base_features = build_base_features(book)
-    return QuantyzeDataLoader._augment_feature_vector(base_features, previous_base_features)
+    return QuantyzeDataLoader.augment_feature_vector(base_features, previous_base_features)
 
 
 def load_agent(path: str) -> Agent | None:
@@ -348,3 +348,23 @@ def load_agent(path: str) -> Agent | None:
         return None
 
     return agent
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': [
+            'os', 'warnings', 'typing', 'numpy', 'torch',
+            'torch.utils.data', 'data_loader', 'order_book', 'doctest', 'python_ta'
+        ],
+        'disable': [
+            'forbidden-top-level-code',
+            'forbidden-io-function',
+            'too-many-instance-attributes'
+        ],
+        'max-line-length': 120
+    })

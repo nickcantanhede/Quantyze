@@ -1,0 +1,5 @@
+# Quantyze project dependencies
+numpy
+torch
+flask
+python-ta
