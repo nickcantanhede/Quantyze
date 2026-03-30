@@ -390,22 +390,87 @@ class DataLoader:
 
     @staticmethod
     def _balanced_flow(n: int) -> list[Event]:
-        """Return n synthetic limit-order events with balanced buy and sell flow.
+        """Return n synthetic events for a stable but active market.
 
         Preconditions:
         - n >= 0
         """
+
         base_time = datetime.now()
-        synthetic_events = []
+        events = []
+        tracked_buy_ids = []
+        tracked_sell_ids = []
 
-        for i in range(n):
-            timestamp = base_time + timedelta(seconds=i)
-            side = 'buy' if i % 2 == 0 else 'sell'
-            price = 99.5 if side == 'buy' else 100.5
-            event = Event(timestamp, f"order_{i}", side, 'limit', price, 10.0)
-            synthetic_events.append(event)
+        def _add_event(odr_id: str, side: str, order_type: str, price: float | None, qty: float) -> None:
+            """Append one event using the next sequential synthetic timestamp."""
+            timestamp = base_time + timedelta(seconds=len(events))
+            event = Event(timestamp, odr_id, side, order_type, price, qty)
+            events.append(event)
 
-        return synthetic_events
+        # Seed the book with a small ladder of resting bids and asks near 100.
+        seed_orders = [
+            ("seed_bid_0", "buy", "limit", 99.9, 12.0),
+            ("seed_ask_0", "sell", "limit", 100.1, 12.0),
+            ("seed_bid_1", "buy", "limit", 99.8, 10.0),
+            ("seed_ask_1", "sell", "limit", 100.2, 10.0),
+            ("seed_bid_2", "buy", "limit", 99.7, 8.0),
+            ("seed_ask_2", "sell", "limit", 100.3, 8.0),
+        ]
+
+        i = 0
+        while len(events) < n and i < len(seed_orders):
+            _add_event(
+                seed_orders[i][0],
+                seed_orders[i][1],
+                seed_orders[i][2],
+                seed_orders[i][3],
+                seed_orders[i][4]
+            )
+            i += 1
+
+        cycle_so_far = 0
+        while len(events) < n:
+            step = cycle_so_far % 8
+            index = len(events)
+
+            if step == 0:
+                order_id = f"rest_bid_{index}"
+                tracked_buy_ids.append(order_id)
+                _add_event(order_id, "buy", "limit", 99.7, 4.0)
+            elif step == 1:
+                order_id = f"rest_ask_{index}"
+                tracked_sell_ids.append(order_id)
+                _add_event(order_id, "sell", "limit", 100.3, 4.0)
+            elif step == 2:
+                _add_event(f"cross_buy_{index}", "buy", "limit", 100.2, 6.0)
+
+            elif step == 3:
+                _add_event(f"cross_sell_{index}", "sell", "limit", 99.8, 6.0)
+
+            elif step == 4:
+                _add_event(f"market_buy_{index}", "buy", "market", None, 4.0)
+
+            elif step == 5:
+                _add_event(f"market_sell_{index}", "sell", "market", None, 4.0)
+
+            elif step == 6 and tracked_buy_ids:
+                _add_event(tracked_buy_ids.pop(0), "buy", "cancel", None, 0.0)
+
+            elif step == 7 and tracked_sell_ids:
+                _add_event(tracked_sell_ids.pop(0), "sell", "cancel", None, 0.0)
+            else:
+                if step == 6:
+                    order_id = f"fallback_bid_{index}"
+                    tracked_buy_ids.append(order_id)
+                    _add_event(order_id, "buy", "limit", 99.7, 4.0)
+                else:
+                    order_id = f"fallback_ask_{index}"
+                    tracked_sell_ids.append(order_id)
+                    _add_event(order_id, "sell", "limit", 100.3, 4.0)
+
+            cycle_so_far += 1
+
+        return events
 
     @staticmethod
     def _low_liquidity(n: int) -> list[Event]:
@@ -590,6 +655,35 @@ class DataLoader:
         """Return the model-ready label vector for the current source."""
         _, labels = self.build_training_dataset(orderbook_path)
         return labels
+
+    def export_training_csv(self, path: str, orderbook_path: str | None = None) -> None:
+        """Write the current model-ready training dataset to a CSV file."""
+        features, labels = self.build_training_dataset(orderbook_path)
+
+        header = [
+            "best_bid_price",
+            "best_bid_size",
+            "best_ask_price",
+            "best_ask_size",
+            "spread",
+            "mid_price",
+            "imbalance",
+            "bid_price_2",
+            "bid_size_2",
+            "ask_price_2",
+            "ask_size_2",
+            "event_side",
+            "label",
+        ]
+
+        with open(path, "w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(header)
+
+            for feature_row, label in zip(features, labels):
+                writer.writerow(feature_row.tolist() + [int(label)])
+
+
 
     def get_visualization_annotations(self) -> list[dict]:
         """Return a copy of the LOBSTER-specific visualization annotations."""
