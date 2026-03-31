@@ -39,12 +39,16 @@ Project references:
 Generated or runtime artifacts currently present in the repo root:
 - `log.json`
 - `model.pt`
+- `training_metrics.json`
 - `training_data.csv`
+- `latest_model.pt`
+- `latest_training_metrics.json`
+- `latest_training_data.csv`
 
-Sample submission dataset artifacts:
-- `sample_internal.csv`
-- `dataset_manifest.txt`
+Submission dataset package:
 - `quantyze_datasets.zip`
+- package contents: `sample_internal.csv`, `huge_internal.csv`,
+  `dataset_manifest.txt`, `model.pt`, and `training_metrics.json`
 
 ## Architecture Summary
 
@@ -97,13 +101,13 @@ plus a short one-step history signal:
 15. one-step mid-price delta
 16. one-step imbalance delta
 
-Labels use a fixed 25-event horizon with a +/- $0.01 move threshold:
+Labels use a fixed 50-event horizon with a +/- $0.01 move threshold:
 - `0 = buy`
 - `1 = sell`
 - `2 = hold`
 
 More concretely:
-- if the mid-price 25 events later is more than `0.01` above the current mid,
+- if the mid-price 50 events later is more than `0.01` above the current mid,
   the label is `buy`
 - if it is more than `0.01` below the current mid, the label is `sell`
 - otherwise the label is `hold`
@@ -127,6 +131,44 @@ After training, Quantyze also writes `training_metrics.json`, which stores the
 loss curves, validation accuracy, majority-class baseline, per-class recall,
 prediction counts, and confusion matrix.
 
+The shipped saved-state artifacts are:
+- `model.pt`
+- `training_metrics.json`
+- `training_data.csv`
+
+These baseline artifacts are intended to come from `huge_internal.csv`. New
+training runs from the menu or the direct CLI should write to:
+- `latest_model.pt`
+- `latest_training_metrics.json`
+- `latest_training_data.csv`
+
+This keeps the packaged saved checkpoint stable for grading while still
+letting the TA run a short training example and inspect the new results.
+
+## TA Menu
+
+Running `main.py` with no arguments now opens the TA-facing interactive menu.
+This is the primary grading path.
+
+```bash
+python3 main.py
+```
+
+```powershell
+py -3 main.py
+```
+
+The menu supports:
+- running the default simulation with a saved checkpoint
+- running a simulation on a chosen synthetic scenario
+- training on the packaged `sample_internal.csv`
+- training on a custom CSV path
+- viewing both the packaged baseline metrics and any newer training metrics
+
+The submitted dataset zip should be extracted beside `main.py` before using
+the sample-training option. The default simulation continues to use `model.pt`
+even after new training runs create `latest_model.pt`.
+
 ## Useful Commands
 
 Syntax check:
@@ -135,10 +177,14 @@ Syntax check:
 python3 -m py_compile *.py
 ```
 
-Run the default synthetic simulation:
+Run the default synthetic simulation directly:
 
 ```bash
 python3 main.py --no-ui
+```
+
+```powershell
+py -3 main.py --no-ui
 ```
 
 This writes `log.json` in addition to printing the terminal summary.
@@ -149,10 +195,25 @@ Train on an internal CSV:
 python3 main.py --train --data sample_internal.csv
 ```
 
+```powershell
+py -3 main.py --train --data sample_internal.csv
+```
+
+This writes:
+- `latest_model.pt`
+- `latest_training_metrics.json`
+- `latest_training_data.csv`
+
+It does not overwrite the shipped `model.pt` or `training_metrics.json`.
+
 Train on a raw LOBSTER message file:
 
 ```bash
 python3 main.py --train --data <lobster_message_csv>
+```
+
+```powershell
+py -3 main.py --train --data <lobster_message_csv>
 ```
 
 Export training data manually from Python:
@@ -175,11 +236,13 @@ The current lightweight validation flow is:
 
 ```bash
 python3 -m py_compile *.py
-python3 main.py --no-ui
+python3 main.py
 ```
 
 This confirms:
 - Python modules compile cleanly
-- the default synthetic simulation still runs end-to-end
-- the default run writes `log.json` with the execution records from the simulation
-- a saved checkpoint can be loaded during simulation if `model.pt` is valid
+- the default run opens the interactive TA menu
+- the default or scenario simulation still runs end-to-end
+- the simulation run writes `log.json` with the execution records from the simulation
+- the shipped `model.pt` checkpoint can be loaded during simulation if it is valid
+- a short training run writes separate `latest_*` artifacts without replacing the shipped checkpoint

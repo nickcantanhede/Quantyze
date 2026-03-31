@@ -46,6 +46,10 @@ from order_book import OrderBook
 CLASS_NAMES = ["buy", "sell", "hold"]
 MODEL_PATH = "model.pt"
 TRAINING_METRICS_PATH = "training_metrics.json"
+TRAINING_DATA_PATH = "training_data.csv"
+LATEST_MODEL_PATH = "latest_model.pt"
+LATEST_TRAINING_METRICS_PATH = "latest_training_metrics.json"
+LATEST_TRAINING_DATA_PATH = "latest_training_data.csv"
 LOG_PATH = "log.json"
 SAMPLE_DATASET_PATH = "sample_internal.csv"
 SCENARIO_CHOICES = ("balanced", "low_liquidity", "high_volatility")
@@ -233,7 +237,12 @@ def _evaluate_classifier(model: OrderBookNet, loader: TorchDataLoader) -> dict[s
     }
 
 
-def train_model(data_path: str) -> None:
+def train_model(
+    data_path: str,
+    model_path: str = LATEST_MODEL_PATH,
+    metrics_path: str = LATEST_TRAINING_METRICS_PATH,
+    training_data_path: str = LATEST_TRAINING_DATA_PATH
+) -> dict[str, object]:
     """Train the optional OrderBookNet model using data from <data_path>.
 
     This function loads training data, constructs the neural-network training
@@ -259,7 +268,7 @@ def train_model(data_path: str) -> None:
     train_features = raw_feature_tensor[train_indices]
     feature_mean, feature_std = _compute_feature_normalization(train_features)
     normalized_feature_tensor = (raw_feature_tensor - feature_mean) / feature_std
-    _export_training_csv("training_data.csv", normalized_feature_tensor, label_tensor)
+    _export_training_csv(training_data_path, normalized_feature_tensor, label_tensor)
 
     train_labels = label_tensor[train_indices]
     class_weights = _compute_class_weights(train_labels)
@@ -273,7 +282,7 @@ def train_model(data_path: str) -> None:
     trainer = Trainer(model, class_weights=class_weights)
     trainer.fit(train_loader, val_loader)
     trainer.save(
-        "model.pt",
+        model_path,
         feature_mean=feature_mean.cpu().numpy(),
         feature_std=feature_std.cpu().numpy()
     )
@@ -289,9 +298,12 @@ def train_model(data_path: str) -> None:
         "val_pred_counts": metrics["val_pred_counts"],
         "per_class_recall": metrics["per_class_recall"],
         "confusion_matrix": metrics["confusion_matrix"],
+        "dataset_path": data_path,
+        "model_output_path": model_path,
+        "training_data_output_path": training_data_path,
     }
 
-    with open("training_metrics.json", "w", encoding="utf-8") as file:
+    with open(metrics_path, "w", encoding="utf-8") as file:
         json.dump(training_metrics, file, indent=2)
 
     print("Training Evaluation Metrics")
@@ -302,7 +314,12 @@ def train_model(data_path: str) -> None:
     print(f"Validation Pred Counts: {training_metrics['val_pred_counts']}")
     print(f"Per-Class Recall: {training_metrics['per_class_recall']}")
     print(f"Confusion Matrix: {training_metrics['confusion_matrix']}")
+    print(f"Dataset Path: {data_path}")
+    print(f"Checkpoint Output: {model_path}")
+    print(f"Metrics Output: {metrics_path}")
+    print(f"Training Data Output: {training_data_path}")
     print("=" * 30)
+    return training_metrics
 
 
 def run_simulation_from_args(args: argparse.Namespace) -> None:
@@ -320,28 +337,47 @@ def run_simulation_from_args(args: argparse.Namespace) -> None:
     print(f"Execution log written to {LOG_PATH}.")
 
 
-def print_saved_training_metrics(path: str = TRAINING_METRICS_PATH) -> None:
-    """Print the latest saved training metrics from a JSON artifact."""
+def _print_metrics_file(path: str, heading: str) -> bool:
+    """Print one metrics artifact; return whether the file was displayed."""
     try:
         with open(path, encoding="utf-8") as file:
             metrics = json.load(file)
     except FileNotFoundError:
-        print(f"No saved metrics found at {path}. Train a model first.")
-        return
+        return False
     except json.JSONDecodeError:
         print(f"Could not read {path}; the file is not valid JSON.")
-        return
+        return True
     except OSError as exc:
         print(f"Could not open {path}: {exc}")
-        return
+        return True
 
-    print("Saved Training Metrics")
+    print(heading)
     print("=" * 30)
     print(f"Validation Accuracy: {metrics.get('val_accuracy', 'Unavailable')}")
     print(f"Majority Baseline Accuracy: {metrics.get('majority_baseline_accuracy', 'Unavailable')}")
     print(f"Per-Class Recall: {metrics.get('per_class_recall', 'Unavailable')}")
     print(f"Confusion Matrix: {metrics.get('confusion_matrix', 'Unavailable')}")
+    if 'dataset_path' in metrics:
+        print(f"Dataset Path: {metrics['dataset_path']}")
+    if 'model_output_path' in metrics:
+        print(f"Checkpoint Output: {metrics['model_output_path']}")
     print("=" * 30)
+    return True
+
+
+def print_saved_training_metrics() -> None:
+    """Print the packaged metrics and any newer training metrics if available."""
+    displayed_any = False
+
+    displayed_any = _print_metrics_file(
+        TRAINING_METRICS_PATH, "Saved Baseline Metrics"
+    ) or displayed_any
+    displayed_any = _print_metrics_file(
+        LATEST_TRAINING_METRICS_PATH, "Latest Training Metrics"
+    ) or displayed_any
+
+    if not displayed_any:
+        print("No saved metrics found. Train a model first.")
 
 
 def _prompt_text(prompt: str) -> str | None:
@@ -379,6 +415,11 @@ def _run_training_menu(data_path: str) -> None:
 
     try:
         train_model(data_path)
+        print(
+            f"Saved baseline checkpoint remains at {MODEL_PATH}. "
+            f"New training outputs were written to {LATEST_MODEL_PATH} and "
+            f"{LATEST_TRAINING_METRICS_PATH}."
+        )
     except (FileNotFoundError, ValueError, OSError) as exc:
         print(f"Training failed: {exc}")
     except Exception as exc:  # pragma: no cover - defensive menu guard
@@ -394,7 +435,7 @@ def interactive_menu() -> None:
         print("2. Run simulation on a synthetic scenario")
         print(f"3. Train on {SAMPLE_DATASET_PATH}")
         print("4. Train on a custom CSV path")
-        print(f"5. View latest saved metrics from {TRAINING_METRICS_PATH}")
+        print("5. View saved and latest training metrics")
         print("6. Exit")
 
         choice = _prompt_text("Select an option (1-6): ")
