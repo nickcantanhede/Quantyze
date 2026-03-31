@@ -32,6 +32,7 @@ import csv
 import json
 import os
 import sys
+import zipfile
 
 import torch
 from flask import Flask
@@ -52,6 +53,7 @@ LATEST_TRAINING_METRICS_PATH = "latest_training_metrics.json"
 LATEST_TRAINING_DATA_PATH = "latest_training_data.csv"
 LOG_PATH = "log.json"
 SAMPLE_DATASET_PATH = "sample_internal.csv"
+HUGE_DATASET_PATH = "huge_internal.csv"
 SCENARIO_CHOICES = ("balanced", "low_liquidity", "high_volatility")
 
 
@@ -111,12 +113,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def build_system(args: argparse.Namespace) -> tuple[OrderBook, MatchingEngine, EventStream, Agent | None]:
+def build_system(
+    args: argparse.Namespace
+) -> tuple[OrderBook, MatchingEngine, EventStream, Agent | None, DataLoader]:
     """Construct and return the core Quantyze system objects.
 
     This function creates the order book, matching engine, event stream, and
     optional agent needed to run the program from the parsed command-line
-    arguments.
+    arguments. It also returns the loader used to provide event data so callers
+    can report detected source-format metadata.
     """
 
     book = OrderBook()
@@ -138,7 +143,7 @@ def build_system(args: argparse.Namespace) -> tuple[OrderBook, MatchingEngine, E
     else:
         agent = load_agent(MODEL_PATH)
 
-    return book, engine, stream, agent
+    return book, engine, stream, agent, loader
 
 
 def run_simulation(stream: EventStream, agent: Agent | None, book: OrderBook) -> None:
@@ -324,12 +329,25 @@ def train_model(
 
 def run_simulation_from_args(args: argparse.Namespace) -> None:
     """Run one simulation from a prepared argument namespace."""
-    book, engine, stream, agent = build_system(args)
+    book, engine, stream, agent, loader = build_system(args)
 
     if agent is None:
         print(f"Running without ML checkpoint; {MODEL_PATH} is missing or invalid.")
     else:
         print(f"Loaded saved model checkpoint from {MODEL_PATH}.")
+
+    if args.data is not None:
+        print(f"Replay dataset path: {args.data}")
+        print(f"Detected source format: {loader.source_format}")
+        if loader.source_format == "lobster":
+            print(
+                "Recognized "
+                f"{len(loader.special_events)} non-replayable LOBSTER annotations."
+            )
+    elif args.scenario is not None:
+        print(f"Running synthetic scenario: {args.scenario}")
+    else:
+        print("Running default synthetic scenario: balanced")
 
     run_simulation(stream, agent, book)
     print_summary(engine, agent)
@@ -380,6 +398,18 @@ def print_saved_training_metrics() -> None:
         print("No saved metrics found. Train a model first.")
 
 
+def print_baseline_training_metrics() -> None:
+    """Print only the packaged baseline metrics artifact."""
+    if not _print_metrics_file(TRAINING_METRICS_PATH, "Saved Baseline Metrics"):
+        print(f"Baseline metrics not found at {TRAINING_METRICS_PATH}.")
+
+
+def print_latest_training_metrics() -> None:
+    """Print only the newest training metrics artifact, if present."""
+    if not _print_metrics_file(LATEST_TRAINING_METRICS_PATH, "Latest Training Metrics"):
+        print(f"Latest metrics not found at {LATEST_TRAINING_METRICS_PATH}.")
+
+
 def _prompt_text(prompt: str) -> str | None:
     """Return stripped terminal input, or None if the prompt is cancelled."""
     try:
@@ -407,10 +437,80 @@ def _prompt_scenario() -> str | None:
         print(f"Invalid scenario. Please choose one of: {scenario_text}.")
 
 
-def _run_training_menu(data_path: str) -> None:
+def _prompt_replay_speed() -> float | None:
+    """Prompt for a non-negative replay speed; blank returns the default 0.0."""
+    while True:
+        speed_text = _prompt_text("Enter replay speed (blank uses 0.0): ")
+        if speed_text is None:
+            return None
+
+        if speed_text == "":
+            return 0.0
+
+        try:
+            speed = float(speed_text)
+        except ValueError:
+            print("Replay speed must be numeric.")
+            continue
+
+        if speed < 0:
+            print("Replay speed must be non-negative.")
+            continue
+
+        return speed
+
+
+def _prompt_dataset_path(action: str) -> str | None:
+    """Prompt for a dataset path or return None when cancelled."""
+    data_path = _prompt_text(f"Enter the CSV path to {action} (blank cancels): ")
+    if data_path is None or data_path == "":
+        print("Path entry cancelled.")
+        return None
+    return data_path
+
+
+def _build_runtime_args(
+    data: str | None = None,
+    scenario: str | None = None,
+    speed: float = 0.0,
+    train: bool = False
+) -> argparse.Namespace:
+    """Return a namespace shaped like the CLI parser output."""
+    return argparse.Namespace(
+        data=data,
+        scenario=scenario,
+        speed=speed,
+        train=train,
+        port=9000,
+        no_ui=True
+    )
+
+
+def _print_packaged_dataset_hint(dataset_name: str) -> None:
+    """Explain how to make packaged datasets available to the menu."""
+    print(
+        f"Could not find packaged dataset at {dataset_name}. "
+        "Extract quantyze_datasets.zip beside main.py and try again."
+    )
+
+
+def _run_simulation_menu(args: argparse.Namespace) -> None:
+    """Run one simulation from the interactive menu with friendly error handling."""
+    try:
+        run_simulation_from_args(args)
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        print(f"Simulation failed: {exc}")
+    except Exception as exc:  # pragma: no cover - defensive menu guard
+        print(f"Simulation failed unexpectedly: {type(exc).__name__}: {exc}")
+
+
+def _run_training_menu(data_path: str, packaged: bool = False) -> None:
     """Run the training flow from the interactive menu and report any failures."""
     if not os.path.exists(data_path):
-        print(f"Could not find dataset at {data_path}.")
+        if packaged:
+            _print_packaged_dataset_hint(data_path)
+        else:
+            print(f"Could not find dataset at {data_path}.")
         return
 
     try:
@@ -426,62 +526,289 @@ def _run_training_menu(data_path: str) -> None:
         print(f"Training failed unexpectedly: {type(exc).__name__}: {exc}")
 
 
-def interactive_menu() -> None:
-    """Run the TA-facing interactive menu until the user chooses to exit."""
-    while True:
-        print("\nQuantyze Interactive Menu")
-        print("=" * 30)
-        print("1. Run default simulation with saved model")
-        print("2. Run simulation on a synthetic scenario")
-        print(f"3. Train on {SAMPLE_DATASET_PATH}")
-        print("4. Train on a custom CSV path")
-        print("5. View saved and latest training metrics")
-        print("6. Exit")
+def _print_training_output_targets() -> None:
+    """Print baseline and latest training artifact destinations."""
+    print("Baseline saved-state artifacts")
+    print("=" * 30)
+    print(f"Checkpoint: {os.path.abspath(MODEL_PATH)}")
+    print(f"Metrics: {os.path.abspath(TRAINING_METRICS_PATH)}")
+    print(f"Training Data: {os.path.abspath(TRAINING_DATA_PATH)}")
+    print("=" * 30)
+    print("Latest training outputs")
+    print("=" * 30)
+    print(f"Checkpoint: {os.path.abspath(LATEST_MODEL_PATH)}")
+    print(f"Metrics: {os.path.abspath(LATEST_TRAINING_METRICS_PATH)}")
+    print(f"Training Data: {os.path.abspath(LATEST_TRAINING_DATA_PATH)}")
+    print("Interactive and direct retraining write only to the latest_* artifacts.")
+    print("=" * 30)
 
-        choice = _prompt_text("Select an option (1-6): ")
-        if choice is None or choice == "6":
-            print("Exiting Quantyze.")
+
+def _print_simulation_configuration() -> None:
+    """Print the current baseline simulation configuration."""
+    checkpoint_loaded = load_agent(MODEL_PATH) is not None
+    print("Simulation Configuration")
+    print("=" * 30)
+    print(f"Baseline checkpoint path: {os.path.abspath(MODEL_PATH)}")
+    print(f"Baseline checkpoint available: {checkpoint_loaded}")
+    print(f"Default execution log path: {os.path.abspath(LOG_PATH)}")
+    print(f"Supported synthetic scenarios: {', '.join(SCENARIO_CHOICES)}")
+    print("=" * 30)
+
+
+def _print_artifact_status() -> None:
+    """Print existence and size details for important project artifacts."""
+    artifact_names = [
+        MODEL_PATH,
+        TRAINING_METRICS_PATH,
+        TRAINING_DATA_PATH,
+        LATEST_MODEL_PATH,
+        LATEST_TRAINING_METRICS_PATH,
+        LATEST_TRAINING_DATA_PATH,
+        "quantyze_datasets.zip"
+    ]
+
+    print("Artifact Status")
+    print("=" * 30)
+    for artifact_name in artifact_names:
+        artifact_path = os.path.abspath(artifact_name)
+        exists = os.path.exists(artifact_name)
+        size_text = f"{os.path.getsize(artifact_name)} bytes" if exists else "Missing"
+        print(f"{artifact_name}: {'Present' if exists else 'Missing'}")
+        print(f"  Path: {artifact_path}")
+        print(f"  Size: {size_text}")
+    print("=" * 30)
+
+
+def _print_log_summary() -> None:
+    """Print a short summary of the current execution log."""
+    if not os.path.exists(LOG_PATH):
+        print(f"No execution log found at {LOG_PATH}. Run a simulation first.")
+        return
+
+    try:
+        with open(LOG_PATH, encoding="utf-8") as file:
+            records = json.load(file)
+    except json.JSONDecodeError:
+        print(f"Could not read {LOG_PATH}; the file is not valid JSON.")
+        return
+    except OSError as exc:
+        print(f"Could not open {LOG_PATH}: {exc}")
+        return
+
+    if not isinstance(records, list):
+        print(f"{LOG_PATH} does not contain a list of execution records.")
+        return
+
+    print("Execution Log Summary")
+    print("=" * 30)
+    print(f"Record Count: {len(records)}")
+    if records:
+        print(f"First Record: {json.dumps(records[0])}")
+        print(f"Last Record: {json.dumps(records[-1])}")
+    print("=" * 30)
+
+
+def _print_dataset_package_contents() -> None:
+    """List the contents of quantyze_datasets.zip if it exists."""
+    package_path = "quantyze_datasets.zip"
+    if not os.path.exists(package_path):
+        print(f"Dataset package not found at {package_path}.")
+        return
+
+    try:
+        with zipfile.ZipFile(package_path) as archive:
+            members = archive.infolist()
+    except (OSError, zipfile.BadZipFile) as exc:
+        print(f"Could not read {package_path}: {exc}")
+        return
+
+    print("Dataset Package Contents")
+    print("=" * 30)
+    for member in members:
+        print(f"{member.filename} ({member.file_size} bytes)")
+    print("=" * 30)
+
+
+def _print_help_reference() -> None:
+    """Print a concise command reference matching the README."""
+    print("Quantyze Command Reference")
+    print("=" * 30)
+    print("Interactive menu:")
+    print("  Mac/Linux: python3 main.py")
+    print("  Windows:   py -3 main.py")
+    print("Direct simulation:")
+    print("  Mac/Linux: python3 main.py --no-ui")
+    print("  Windows:   py -3 main.py --no-ui")
+    print("Train on packaged sample dataset:")
+    print(f"  Mac/Linux: python3 main.py --train --data {SAMPLE_DATASET_PATH}")
+    print(f"  Windows:   py -3 main.py --train --data {SAMPLE_DATASET_PATH}")
+    print("Train on packaged huge dataset:")
+    print(f"  Mac/Linux: python3 main.py --train --data {HUGE_DATASET_PATH}")
+    print(f"  Windows:   py -3 main.py --train --data {HUGE_DATASET_PATH}")
+    print("Train on a custom dataset:")
+    print("  Mac/Linux: python3 main.py --train --data <csv_path>")
+    print("  Windows:   py -3 main.py --train --data <csv_path>")
+    print("Dataset package note:")
+    print(
+        "  Extract quantyze_datasets.zip beside main.py before using packaged "
+        "sample or huge training options."
+    )
+    print("Supported dataset types:")
+    print("  - internal Quantyze CSV")
+    print("  - raw LOBSTER message CSV; the paired orderbook path is inferred by filename")
+    print("=" * 30)
+
+
+def _simulation_menu() -> None:
+    """Run the simulation submenu until the user chooses to go back."""
+    while True:
+        print("\nSimulation Menu")
+        print("=" * 30)
+        print("1. Run default saved-model simulation")
+        print("2. Run synthetic scenario")
+        print("3. Replay from dataset path")
+        print("4. View current simulation configuration")
+        print("5. Back")
+
+        choice = _prompt_text("Select an option (1-5): ")
+        if choice is None or choice == "5":
             return
 
         if choice == "1":
-            run_simulation_from_args(
-                argparse.Namespace(
-                    data=None,
-                    scenario=None,
-                    speed=0.0,
-                    train=False,
-                    port=9000,
-                    no_ui=True
-                )
-            )
+            _run_simulation_menu(_build_runtime_args())
         elif choice == "2":
             scenario = _prompt_scenario()
             if scenario is None:
                 continue
 
-            run_simulation_from_args(
-                argparse.Namespace(
-                    data=None,
-                    scenario=scenario,
-                    speed=0.0,
-                    train=False,
-                    port=9000,
-                    no_ui=True
-                )
-            )
-        elif choice == "3":
-            _run_training_menu(SAMPLE_DATASET_PATH)
-        elif choice == "4":
-            data_path = _prompt_text("Enter the CSV path to train on (blank cancels): ")
-            if data_path is None or data_path == "":
-                print("Training cancelled.")
+            speed = _prompt_replay_speed()
+            if speed is None:
                 continue
 
-            _run_training_menu(data_path)
-        elif choice == "5":
-            print_saved_training_metrics()
+            _run_simulation_menu(_build_runtime_args(scenario=scenario, speed=speed))
+        elif choice == "3":
+            data_path = _prompt_dataset_path("replay")
+            if data_path is None:
+                continue
+
+            speed = _prompt_replay_speed()
+            if speed is None:
+                continue
+
+            _run_simulation_menu(_build_runtime_args(data=data_path, speed=speed))
+        elif choice == "4":
+            _print_simulation_configuration()
         else:
-            print("Invalid option. Please enter a number from 1 to 6.")
+            print("Invalid option. Please enter a number from 1 to 5.")
+
+
+def _training_menu() -> None:
+    """Run the training submenu until the user chooses to go back."""
+    while True:
+        print("\nTraining Menu")
+        print("=" * 30)
+        print(f"1. Train on packaged {SAMPLE_DATASET_PATH}")
+        print(f"2. Train on packaged {HUGE_DATASET_PATH}")
+        print("3. Train on a custom dataset path")
+        print("4. View training output targets")
+        print("5. Back")
+
+        choice = _prompt_text("Select an option (1-5): ")
+        if choice is None or choice == "5":
+            return
+
+        if choice == "1":
+            _run_training_menu(SAMPLE_DATASET_PATH, packaged=True)
+        elif choice == "2":
+            _run_training_menu(HUGE_DATASET_PATH, packaged=True)
+        elif choice == "3":
+            data_path = _prompt_dataset_path("train on")
+            if data_path is None:
+                continue
+            _run_training_menu(data_path)
+        elif choice == "4":
+            _print_training_output_targets()
+        else:
+            print("Invalid option. Please enter a number from 1 to 5.")
+
+
+def _artifacts_menu() -> None:
+    """Run the artifacts and metrics submenu until the user chooses to go back."""
+    while True:
+        print("\nArtifacts & Metrics Menu")
+        print("=" * 30)
+        print("1. View baseline metrics")
+        print("2. View latest metrics")
+        print("3. View both baseline and latest metrics")
+        print("4. View artifact status")
+        print("5. View log summary")
+        print("6. View dataset package contents")
+        print("7. Back")
+
+        choice = _prompt_text("Select an option (1-7): ")
+        if choice is None or choice == "7":
+            return
+
+        if choice == "1":
+            print_baseline_training_metrics()
+        elif choice == "2":
+            print_latest_training_metrics()
+        elif choice == "3":
+            print_saved_training_metrics()
+        elif choice == "4":
+            _print_artifact_status()
+        elif choice == "5":
+            _print_log_summary()
+        elif choice == "6":
+            _print_dataset_package_contents()
+        else:
+            print("Invalid option. Please enter a number from 1 to 7.")
+
+
+def _help_menu() -> None:
+    """Run the help submenu until the user chooses to go back."""
+    while True:
+        print("\nHelp / Command Reference")
+        print("=" * 30)
+        print("1. View command reference")
+        print("2. Back")
+
+        choice = _prompt_text("Select an option (1-2): ")
+        if choice is None or choice == "2":
+            return
+
+        if choice == "1":
+            _print_help_reference()
+        else:
+            print("Invalid option. Please enter 1 or 2.")
+
+
+def interactive_menu() -> None:
+    """Run the TA-facing interactive menu until the user chooses to exit."""
+    while True:
+        print("\nQuantyze Interactive Menu")
+        print("=" * 30)
+        print("1. Simulation")
+        print("2. Training")
+        print("3. Artifacts & Metrics")
+        print("4. Help / Command Reference")
+        print("5. Exit")
+
+        choice = _prompt_text("Select an option (1-5): ")
+        if choice is None or choice == "5":
+            print("Exiting Quantyze.")
+            return
+
+        if choice == "1":
+            _simulation_menu()
+        elif choice == "2":
+            _training_menu()
+        elif choice == "3":
+            _artifacts_menu()
+        elif choice == "4":
+            _help_menu()
+        else:
+            print("Invalid option. Please enter a number from 1 to 5.")
 
 
 def start_flask(app: Flask, port: int) -> None:

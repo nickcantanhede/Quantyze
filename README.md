@@ -12,9 +12,11 @@ Current backend status:
 - the order book, matching engine, and event replay path compile and run
 - the synthetic `balanced` scenario now targets an active market instead of a
   completely static non-crossing book
-- the training pipeline can build model-ready datasets, export
-  `training_data.csv`
-- the main training flow now writes both `training_data.csv` and `model.pt`
+- the training pipeline can build model-ready datasets and export normalized
+  training CSV artifacts
+- the main training flow writes `latest_model.pt`,
+  `latest_training_metrics.json`, and `latest_training_data.csv` without
+  overwriting the packaged baseline artifacts
 - raw LOBSTER message and orderbook files are supported for dataset building
 
 ## Repository Layout
@@ -36,7 +38,7 @@ Project references:
 - `Quantyze_Class_Reference.docx`
 - team documentation in the project proposal folder
 
-Generated or runtime artifacts currently present in the repo root:
+Generated or runtime artifact names used by the project:
 - `log.json`
 - `model.pt`
 - `training_metrics.json`
@@ -49,6 +51,7 @@ Submission dataset package:
 - `quantyze_datasets.zip`
 - package contents: `sample_internal.csv`, `huge_internal.csv`,
   `dataset_manifest.txt`, `model.pt`, and `training_metrics.json`
+- extract this zip beside `main.py` before using the packaged training options
 
 ## Architecture Summary
 
@@ -158,18 +161,44 @@ python3 main.py
 py -3 main.py
 ```
 
-The menu supports:
-- running the default simulation with a saved checkpoint
-- running a simulation on a chosen synthetic scenario
-- training on the packaged `sample_internal.csv`
-- training on a custom CSV path
-- viewing both the packaged baseline metrics and any newer training metrics
+Main menu:
+- `Simulation`
+- `Training`
+- `Artifacts & Metrics`
+- `Help / Command Reference`
+- `Exit`
 
-The submitted dataset zip should be extracted beside `main.py` before using
-the sample-training option. The default simulation continues to use `model.pt`
+Simulation submenu:
+- run the default saved-model simulation
+- run a chosen synthetic scenario with a chosen replay speed
+- replay from a custom internal CSV or raw LOBSTER message CSV path
+- view the current simulation configuration
+
+Training submenu:
+- train on packaged `sample_internal.csv`
+- train on packaged `huge_internal.csv`
+- train on a custom dataset path
+- view the baseline-vs-latest training output targets
+
+Artifacts & Metrics submenu:
+- view baseline metrics
+- view latest metrics
+- view both baseline and latest metrics
+- inspect artifact status
+- inspect the current `log.json`
+- inspect the contents of `quantyze_datasets.zip`
+
+The submitted dataset zip should be extracted beside `main.py` before using the
+packaged training options. The default simulation continues to use `model.pt`
 even after new training runs create `latest_model.pt`.
 
+The interactive menu intentionally does not include the Flask / UI stub because
+that path is not yet a complete runtime flow.
+
 ## Useful Commands
+
+Before using packaged sample or huge datasets, extract `quantyze_datasets.zip`
+beside `main.py`.
 
 Syntax check:
 
@@ -206,6 +235,16 @@ This writes:
 
 It does not overwrite the shipped `model.pt` or `training_metrics.json`.
 
+Train on the packaged huge internal CSV after extraction:
+
+```bash
+python3 main.py --train --data huge_internal.csv
+```
+
+```powershell
+py -3 main.py --train --data huge_internal.csv
+```
+
 Train on a raw LOBSTER message file:
 
 ```bash
@@ -241,7 +280,7 @@ python3 main.py
 
 This confirms:
 - Python modules compile cleanly
-- the default run opens the interactive TA menu
+- the default run opens the nested interactive TA menu
 - the default or scenario simulation still runs end-to-end
 - the simulation run writes `log.json` with the execution records from the simulation
 - the shipped `model.pt` checkpoint can be loaded during simulation if it is valid
