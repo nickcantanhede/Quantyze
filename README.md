@@ -41,6 +41,11 @@ Generated or runtime artifacts currently present in the repo root:
 - `model.pt`
 - `training_data.csv`
 
+Sample submission dataset artifacts:
+- `sample_internal.csv`
+- `dataset_manifest.txt`
+- `quantyze_datasets.zip`
+
 ## Architecture Summary
 
 The intended runtime flow is:
@@ -136,10 +141,12 @@ Run the default synthetic simulation:
 python3 main.py --no-ui
 ```
 
+This writes `log.json` in addition to printing the terminal summary.
+
 Train on an internal CSV:
 
 ```bash
-python3 main.py --train --data <internal_csv_path>
+python3 main.py --train --data sample_internal.csv
 ```
 
 Train on a raw LOBSTER message file:
@@ -174,4 +181,5 @@ python3 main.py --no-ui
 This confirms:
 - Python modules compile cleanly
 - the default synthetic simulation still runs end-to-end
+- the default run writes `log.json` with the execution records from the simulation
 - a saved checkpoint can be loaded during simulation if `model.pt` is valid
