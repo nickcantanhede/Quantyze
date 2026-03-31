@@ -133,9 +133,10 @@ class PriceLevel:
     volume: float
     left: PriceLevel | None
     right: PriceLevel | None
+    _parent_price: float | None
 
     def __init__(self, price: float, orders: Queue | None = None, volume: float = 0.0,
-                 parent_price: float = None) -> None:
+                 parent_price: float | None = None) -> None:
         """Initialise a level at ``price``; allocate a new ``Queue`` when ``orders`` is omitted."""
 
         self.price = price
@@ -219,3 +220,16 @@ class PriceLevel:
                 snapshot.extend(self.right.depth_snapshot(levels - len(snapshot)))
 
             return snapshot[:levels]
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': ['orders', 'doctest', 'python_ta'],
+        'allowed-io': [],
+        'max-line-length': 120
+    })

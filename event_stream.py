@@ -93,3 +93,16 @@ class EventStream:
             self.emit(event)
 
         self.running = False
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': ['datetime', 'time', 'orders', 'matching_engine', 'doctest', 'python_ta'],
+        'allowed-io': [],
+        'max-line-length': 120
+    })

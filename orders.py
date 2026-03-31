@@ -43,7 +43,7 @@ class Event:
     quantity: float
 
     def __init__(self, timestamp: datetime, order_id: str, side: str, order_type: str,
-                 price: float | None, quantity: float):
+                 price: float | None, quantity: float) -> None:
         """Initialize this event with the given order data.
 
         Preconditions:
@@ -252,7 +252,7 @@ class Order(BaseOrder):
     timestamp: datetime
     status: str
 
-    def __init__(self, event: Event):
+    def __init__(self, event: Event) -> None:
         """Initialize this resting order from a validated limit-order event.
 
         Preconditions:
@@ -328,3 +328,17 @@ class Order(BaseOrder):
         - This Order has been fully initialized.
         """
         return self.status == 'cancelled' or self.remaining_qty == 0
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': ['datetime', 'doctest', 'python_ta'],
+        'allowed-io': [],
+        'disable': ['too-many-arguments'],
+        'max-line-length': 120
+    })

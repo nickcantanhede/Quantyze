@@ -278,3 +278,16 @@ class MatchingEngine:
             f"fill_count={self.metrics['fill_count']}, "
             f"cancel_count={self.metrics['cancel_count']})"
         )
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': ['dataclasses', 'order_book', 'orders', 'price_level', 'doctest', 'python_ta'],
+        'allowed-io': [],
+        'max-line-length': 120
+    })
