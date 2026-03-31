@@ -364,6 +364,7 @@ def main() -> None:
         run_simulation(stream, agent, book)
 
         print_summary(engine, agent)
+        book.flush_log("log.json")
 
 
 if __name__ == "__main__":

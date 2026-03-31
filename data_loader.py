@@ -63,7 +63,7 @@ class DataLoader:
     special_events: list[dict]
     _training_features: np.ndarray | None
     _training_labels: np.ndarray | None
-    LABEL_HORIZON_EVENTS: int = 25
+    LABEL_HORIZON_EVENTS: int = 50
     LABEL_MOVE_THRESHOLD: float = 0.01
     BASE_FEATURE_NAMES: tuple[str, ...] = (
         "best_bid_price",
