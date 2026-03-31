@@ -17,11 +17,11 @@ Copyright Information
 Copyright (c) 2026 Cade McNelly, Nicolas Miranda Cantanhede,
 Sahand Samadirand
 """
+import json
+
 from book_tree import BookTree
 from orders import Order
 from price_level import PriceLevel
-
-import json
 
 
 class OrderBook:
@@ -39,7 +39,7 @@ class OrderBook:
     order_index: dict[str, Order]
     trade_log: list[dict]
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Create bid and ask BookTrees and empty order_index and trade_log."""
 
         self.bids = BookTree('bid')
@@ -122,10 +122,11 @@ class OrderBook:
 
     def spread(self) -> float | None:
         """Return best_ask.price minus best_bid.price, or None if either side is missing."""
-
-        return self.best_ask().price - self.best_bid().price \
-            if self.best_bid() is not None and self.best_ask() is not None \
-            else None
+        best_bid = self.best_bid()
+        best_ask = self.best_ask()
+        if best_bid is None or best_ask is None:
+            return None
+        return best_ask.price - best_bid.price
 
     def mid_price(self) -> float | None:
         """Return the arithmetic midpoint of best bid and best ask, or None if undefined."""
@@ -168,3 +169,17 @@ class OrderBook:
             json.dump(self.trade_log, f)
 
         self.trade_log.clear()
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': ['book_tree', 'orders', 'price_level', 'json', 'doctest', 'python_ta'],
+        'allowed-io': ['flush_log'],
+        'disable': ['forbidden-io-function'],
+        'max-line-length': 120
+    })

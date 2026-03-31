@@ -19,12 +19,25 @@ import csv
 import os
 import re
 from datetime import date, datetime, timedelta
+from typing import TypedDict
 
 import numpy as np
 
 from matching_engine import MatchingEngine
 from order_book import OrderBook
 from orders import Event
+
+
+class ParsedLobsterRow(TypedDict):
+    """Typed representation of one normalized raw LOBSTER message row."""
+
+    timestamp: datetime
+    event_type: int
+    order_id: str
+    size: float
+    price_int: int
+    direction: int
+    resting_side: str | None
 
 
 class DataLoader:
@@ -50,6 +63,30 @@ class DataLoader:
     special_events: list[dict]
     _training_features: np.ndarray | None
     _training_labels: np.ndarray | None
+    LABEL_HORIZON_EVENTS: int = 50
+    LABEL_MOVE_THRESHOLD: float = 0.01
+    BASE_FEATURE_NAMES: tuple[str, ...] = (
+        "best_bid_price",
+        "best_bid_size",
+        "best_ask_price",
+        "best_ask_size",
+        "spread",
+        "mid_price",
+        "imbalance",
+        "bid_price_2",
+        "bid_size_2",
+        "ask_price_2",
+        "ask_size_2",
+        "event_side",
+    )
+    HISTORY_FEATURE_NAMES: tuple[str, ...] = (
+        "best_bid_price_delta_1",
+        "best_ask_price_delta_1",
+        "mid_price_delta_1",
+        "imbalance_delta_1",
+    )
+    FEATURE_NAMES: tuple[str, ...] = BASE_FEATURE_NAMES + HISTORY_FEATURE_NAMES
+    FEATURE_DIM: int = len(FEATURE_NAMES)
 
     def __init__(self, filepath: str | None = None) -> None:
         """Initialize this data loader with an optional CSV file path.
@@ -95,7 +132,7 @@ class DataLoader:
             return self._load_internal_csv()
 
         trade_date = self._infer_trade_date()
-        return self._load_lobster_messages(first_row, trade_date, detected)
+        return self._load_lobster_messages(trade_date, detected)
 
     @staticmethod
     def _detect_source_format(first_row: list[str]) -> str:
@@ -142,9 +179,7 @@ class DataLoader:
         self._reset_training_cache()
         return self.events
 
-    def _load_lobster_messages(
-        self, first_row: list[str], trade_date: date, detected_format: str
-    ) -> list[Event]:
+    def _load_lobster_messages(self, trade_date: date, detected_format: str) -> list[Event]:
         """Load a raw LOBSTER message file and convert replayable rows into Events.
 
         Types 6 and 7 are preserved as visualization annotations instead of
@@ -154,7 +189,7 @@ class DataLoader:
             raise ValueError("Filepath cannot be None when loading CSV.")
 
         with open(self.filepath, newline='') as file:
-            rows = [row for row in csv.reader(file)]
+            rows = list(csv.reader(file))
 
         if detected_format == 'lobster_header':
             data_rows = rows[1:]
@@ -162,21 +197,21 @@ class DataLoader:
             data_rows = rows
 
         events = []
-        annotations = []
+        annotation_records = []
         for row_index, row in enumerate(data_rows):
             event = self._lobster_row_to_event(row, trade_date)
             if event is not None:
                 events.append(event)
             annotation = self._lobster_row_to_annotation(row, trade_date, row_index)
             if annotation is not None:
-                annotations.append(annotation)
+                annotation_records.append(annotation)
 
         self.schema = ['Time', 'Event Type', 'Order ID', 'Size', 'Price', 'Direction']
         self.events = events
         self.source_format = 'lobster'
         self.raw_rows = data_rows
         self.raw_orderbook_rows = []
-        self.special_events = annotations
+        self.special_events = annotation_records
         self._reset_training_cache()
         return self.events
 
@@ -233,7 +268,7 @@ class DataLoader:
         return 'sell' if resting_side == 'buy' else 'buy'
 
     @staticmethod
-    def _parse_lobster_row(row: list[str], trade_date: date) -> dict:
+    def _parse_lobster_row(row: list[str], trade_date: date) -> ParsedLobsterRow:
         """Parse one raw LOBSTER row into a normalized dictionary."""
         if len(row) != 6:
             raise ValueError(f"LOBSTER rows must have exactly 6 columns, got {len(row)}.")
@@ -250,19 +285,18 @@ class DataLoader:
 
         timestamp = datetime.combine(trade_date, datetime.min.time()) + timedelta(seconds=time_seconds)
 
-        parsed = {
+        parsed: ParsedLobsterRow = {
             "timestamp": timestamp,
             "event_type": event_type,
             "order_id": order_id,
             "size": size,
             "price_int": price_int,
             "direction": direction,
+            "resting_side": None,
         }
 
         if event_type != 7:
             parsed["resting_side"] = DataLoader._lobster_direction_to_side(direction)
-        else:
-            parsed["resting_side"] = None
 
         return parsed
 
@@ -280,6 +314,9 @@ class DataLoader:
         size = parsed["size"]
         price_int = parsed["price_int"]
         resting_side = parsed["resting_side"]
+
+        if event_type in {1, 2, 3, 4, 5} and resting_side is None:
+            raise ValueError(f"LOBSTER event type {event_type} is missing a resting side.")
 
         if event_type == 1:
             event = Event(timestamp, order_id, resting_side, 'limit', price_int / 10000, size)
@@ -377,22 +414,87 @@ class DataLoader:
 
     @staticmethod
     def _balanced_flow(n: int) -> list[Event]:
-        """Return n synthetic limit-order events with balanced buy and sell flow.
+        """Return n synthetic events for a stable but active market.
 
         Preconditions:
         - n >= 0
         """
+
         base_time = datetime.now()
-        synthetic_events = []
+        events = []
+        tracked_buy_ids = []
+        tracked_sell_ids = []
 
-        for i in range(n):
-            timestamp = base_time + timedelta(seconds=i)
-            side = 'buy' if i % 2 == 0 else 'sell'
-            price = 99.5 if side == 'buy' else 100.5
-            event = Event(timestamp, f"order_{i}", side, 'limit', price, 10.0)
-            synthetic_events.append(event)
+        def _add_event(odr_id: str, side: str, order_type: str, price: float | None, qty: float) -> None:
+            """Append one event using the next sequential synthetic timestamp."""
+            timestamp = base_time + timedelta(seconds=len(events))
+            event = Event(timestamp, odr_id, side, order_type, price, qty)
+            events.append(event)
 
-        return synthetic_events
+        # Seed the book with a small ladder of resting bids and asks near 100.
+        seed_orders = [
+            ("seed_bid_0", "buy", "limit", 99.9, 12.0),
+            ("seed_ask_0", "sell", "limit", 100.1, 12.0),
+            ("seed_bid_1", "buy", "limit", 99.8, 10.0),
+            ("seed_ask_1", "sell", "limit", 100.2, 10.0),
+            ("seed_bid_2", "buy", "limit", 99.7, 8.0),
+            ("seed_ask_2", "sell", "limit", 100.3, 8.0),
+        ]
+
+        i = 0
+        while len(events) < n and i < len(seed_orders):
+            _add_event(
+                seed_orders[i][0],
+                seed_orders[i][1],
+                seed_orders[i][2],
+                seed_orders[i][3],
+                seed_orders[i][4]
+            )
+            i += 1
+
+        cycle_so_far = 0
+        while len(events) < n:
+            step = cycle_so_far % 8
+            index = len(events)
+
+            if step == 0:
+                order_id = f"rest_bid_{index}"
+                tracked_buy_ids.append(order_id)
+                _add_event(order_id, "buy", "limit", 99.7, 4.0)
+            elif step == 1:
+                order_id = f"rest_ask_{index}"
+                tracked_sell_ids.append(order_id)
+                _add_event(order_id, "sell", "limit", 100.3, 4.0)
+            elif step == 2:
+                _add_event(f"cross_buy_{index}", "buy", "limit", 100.2, 6.0)
+
+            elif step == 3:
+                _add_event(f"cross_sell_{index}", "sell", "limit", 99.8, 6.0)
+
+            elif step == 4:
+                _add_event(f"market_buy_{index}", "buy", "market", None, 4.0)
+
+            elif step == 5:
+                _add_event(f"market_sell_{index}", "sell", "market", None, 4.0)
+
+            elif step == 6 and tracked_buy_ids:
+                _add_event(tracked_buy_ids.pop(0), "buy", "cancel", None, 0.0)
+
+            elif step == 7 and tracked_sell_ids:
+                _add_event(tracked_sell_ids.pop(0), "sell", "cancel", None, 0.0)
+            else:
+                if step == 6:
+                    order_id = f"fallback_bid_{index}"
+                    tracked_buy_ids.append(order_id)
+                    _add_event(order_id, "buy", "limit", 99.7, 4.0)
+                else:
+                    order_id = f"fallback_ask_{index}"
+                    tracked_sell_ids.append(order_id)
+                    _add_event(order_id, "sell", "limit", 100.3, 4.0)
+
+            cycle_so_far += 1
+
+        return events
 
     @staticmethod
     def _low_liquidity(n: int) -> list[Event]:
@@ -509,6 +611,7 @@ class DataLoader:
         engine = MatchingEngine(book)
         feature_rows = []
         mids = []
+        previous_base_features: np.ndarray | None = None
 
         for event in self.events:
             engine.process_event(event)
@@ -516,13 +619,15 @@ class DataLoader:
             if mid is None:
                 continue
             snapshot = book.depth_snapshot(levels=2)
-            feature_rows.append(
-                self._feature_vector_from_levels(
-                    snapshot.get('bids', []),
-                    snapshot.get('asks', []),
-                    self._event_side_value(event.side)
-                )
+            base_features = self._feature_vector_from_levels(
+                snapshot.get('bids', []),
+                snapshot.get('asks', []),
+                self._event_side_value(event.side)
             )
+            feature_rows.append(
+                self._augment_feature_vector(base_features, previous_base_features)
+            )
+            previous_base_features = base_features
             mids.append(mid)
 
         if not feature_rows:
@@ -543,6 +648,7 @@ class DataLoader:
 
         feature_rows = []
         mids = []
+        previous_base_features: np.ndarray | None = None
 
         for message_row, book_row in zip(self.raw_rows, orderbook_rows):
             event_type = int(float(message_row[1]))
@@ -554,13 +660,15 @@ class DataLoader:
             if mid is None:
                 continue
 
-            feature_rows.append(
-                self._feature_vector_from_levels(
-                    bids,
-                    asks,
-                    self._lobster_event_side_value(message_row)
-                )
+            base_features = self._feature_vector_from_levels(
+                bids,
+                asks,
+                self._lobster_event_side_value(message_row)
             )
+            feature_rows.append(
+                self._augment_feature_vector(base_features, previous_base_features)
+            )
+            previous_base_features = base_features
             mids.append(mid)
 
         if not feature_rows:
@@ -577,6 +685,17 @@ class DataLoader:
         """Return the model-ready label vector for the current source."""
         _, labels = self.build_training_dataset(orderbook_path)
         return labels
+
+    def export_training_csv(self, path: str, orderbook_path: str | None = None) -> None:
+        """Write the current model-ready training dataset to a CSV file."""
+        features, labels = self.build_training_dataset(orderbook_path)
+
+        with open(path, "w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(list(self.FEATURE_NAMES) + ["label"])
+
+            for feature_row, label in zip(features, labels):
+                writer.writerow(feature_row.tolist() + [int(label)])
 
     def get_visualization_annotations(self) -> list[dict]:
         """Return a copy of the LOBSTER-specific visualization annotations."""
@@ -734,26 +853,59 @@ class DataLoader:
         ], dtype=np.float32)
 
     @staticmethod
+    def feature_vector_from_levels(
+        bids: list[tuple[float, float]],
+        asks: list[tuple[float, float]],
+        event_side: float,
+    ) -> np.ndarray:
+        """Return the public base feature vector used by training and inference."""
+        return DataLoader._feature_vector_from_levels(bids, asks, event_side)
+
+    @staticmethod
+    def _augment_feature_vector(
+        base_features: np.ndarray,
+        previous_base_features: np.ndarray | None,
+    ) -> np.ndarray:
+        """Return the shared feature vector augmented with one-step deltas."""
+        if previous_base_features is None:
+            history_features = np.zeros(len(DataLoader.HISTORY_FEATURE_NAMES), dtype=np.float32)
+        else:
+            history_features = np.array([
+                base_features[0] - previous_base_features[0],
+                base_features[2] - previous_base_features[2],
+                base_features[5] - previous_base_features[5],
+                base_features[6] - previous_base_features[6],
+            ], dtype=np.float32)
+
+        return np.concatenate((base_features, history_features)).astype(np.float32)
+
+    @staticmethod
+    def augment_feature_vector(
+        base_features: np.ndarray,
+        previous_base_features: np.ndarray | None,
+    ) -> np.ndarray:
+        """Return the public history-augmented feature vector used by inference."""
+        return DataLoader._augment_feature_vector(base_features, previous_base_features)
+
+    @staticmethod
     def _labels_from_mid_sequence(mids: list[float]) -> np.ndarray:
-        """Return labels using the next-changed-mid rule."""
+        """Return labels using a fixed event horizon and small-move hold band."""
         if not mids:
             raise ValueError("Cannot derive labels from an empty mid-price sequence.")
 
-        next_diff_mid: list[float | None] = [None] * len(mids)
-        for i in range(len(mids) - 2, -1, -1):
-            if mids[i + 1] != mids[i]:
-                next_diff_mid[i] = mids[i + 1]
-            else:
-                next_diff_mid[i] = next_diff_mid[i + 1]
-
         labels = []
-        for current_mid, future_mid in zip(mids, next_diff_mid):
-            if future_mid is None:
-                labels.append(2)
-            elif future_mid > current_mid:
+        last_index = len(mids) - 1
+        for i, current_mid in enumerate(mids):
+            future_index = min(i + DataLoader.LABEL_HORIZON_EVENTS, last_index)
+            future_mid = mids[future_index]
+            delta = future_mid - current_mid
+
+            if delta > DataLoader.LABEL_MOVE_THRESHOLD:
                 labels.append(0)
-            else:
+            elif delta < -DataLoader.LABEL_MOVE_THRESHOLD:
                 labels.append(1)
+            else:
+                labels.append(2)
 
         return np.array(labels, dtype=np.int64)
 
@@ -761,3 +913,23 @@ class DataLoader:
         """Clear any cached training dataset arrays."""
         self._training_features = None
         self._training_labels = None
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': [
+            'csv', 'os', 're', 'datetime', 'typing', 'numpy',
+            'matching_engine', 'order_book', 'orders', 'doctest', 'python_ta'
+        ],
+        'disable': [
+            'too-many-instance-attributes',
+            'naming-convention-violation',
+            'E9998'
+        ],
+        'max-line-length': 120
+    })
