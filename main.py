@@ -30,6 +30,8 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
+import sys
 
 import torch
 from flask import Flask
@@ -42,6 +44,11 @@ from neural_net import Agent, Trainer, OrderBookNet, load_agent
 from order_book import OrderBook
 
 CLASS_NAMES = ["buy", "sell", "hold"]
+MODEL_PATH = "model.pt"
+TRAINING_METRICS_PATH = "training_metrics.json"
+LOG_PATH = "log.json"
+SAMPLE_DATASET_PATH = "sample_internal.csv"
+SCENARIO_CHOICES = ("balanced", "low_liquidity", "high_volatility")
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,7 +73,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--scenario",
         type=str,
-        choices=["balanced", "low_liquidity", "high_volatility"],
+        choices=list(SCENARIO_CHOICES),
         default=None,
         help="Synthetic scenario to generate if no dataset is provided."
     )
@@ -125,7 +132,7 @@ def build_system(args: argparse.Namespace) -> tuple[OrderBook, MatchingEngine, E
     if args.train:
         agent = None
     else:
-        agent = load_agent("model.pt")
+        agent = load_agent(MODEL_PATH)
 
     return book, engine, stream, agent
 
@@ -298,6 +305,144 @@ def train_model(data_path: str) -> None:
     print("=" * 30)
 
 
+def run_simulation_from_args(args: argparse.Namespace) -> None:
+    """Run one simulation from a prepared argument namespace."""
+    book, engine, stream, agent = build_system(args)
+
+    if agent is None:
+        print(f"Running without ML checkpoint; {MODEL_PATH} is missing or invalid.")
+    else:
+        print(f"Loaded saved model checkpoint from {MODEL_PATH}.")
+
+    run_simulation(stream, agent, book)
+    print_summary(engine, agent)
+    book.flush_log(LOG_PATH)
+    print(f"Execution log written to {LOG_PATH}.")
+
+
+def print_saved_training_metrics(path: str = TRAINING_METRICS_PATH) -> None:
+    """Print the latest saved training metrics from a JSON artifact."""
+    try:
+        with open(path, encoding="utf-8") as file:
+            metrics = json.load(file)
+    except FileNotFoundError:
+        print(f"No saved metrics found at {path}. Train a model first.")
+        return
+    except json.JSONDecodeError:
+        print(f"Could not read {path}; the file is not valid JSON.")
+        return
+    except OSError as exc:
+        print(f"Could not open {path}: {exc}")
+        return
+
+    print("Saved Training Metrics")
+    print("=" * 30)
+    print(f"Validation Accuracy: {metrics.get('val_accuracy', 'Unavailable')}")
+    print(f"Majority Baseline Accuracy: {metrics.get('majority_baseline_accuracy', 'Unavailable')}")
+    print(f"Per-Class Recall: {metrics.get('per_class_recall', 'Unavailable')}")
+    print(f"Confusion Matrix: {metrics.get('confusion_matrix', 'Unavailable')}")
+    print("=" * 30)
+
+
+def _prompt_text(prompt: str) -> str | None:
+    """Return stripped terminal input, or None if the prompt is cancelled."""
+    try:
+        return input(prompt).strip()
+    except (EOFError, KeyboardInterrupt):
+        print("\nInput cancelled.")
+        return None
+
+
+def _prompt_scenario() -> str | None:
+    """Prompt until a valid synthetic scenario is chosen or cancelled."""
+    scenario_text = ", ".join(SCENARIO_CHOICES)
+    while True:
+        scenario = _prompt_text(
+            f"Choose a scenario ({scenario_text}) or press Enter to cancel: "
+        )
+
+        if scenario is None or scenario == "":
+            print("Scenario selection cancelled.")
+            return None
+
+        if scenario in SCENARIO_CHOICES:
+            return scenario
+
+        print(f"Invalid scenario. Please choose one of: {scenario_text}.")
+
+
+def _run_training_menu(data_path: str) -> None:
+    """Run the training flow from the interactive menu and report any failures."""
+    if not os.path.exists(data_path):
+        print(f"Could not find dataset at {data_path}.")
+        return
+
+    try:
+        train_model(data_path)
+    except (FileNotFoundError, ValueError, OSError) as exc:
+        print(f"Training failed: {exc}")
+    except Exception as exc:  # pragma: no cover - defensive menu guard
+        print(f"Training failed unexpectedly: {type(exc).__name__}: {exc}")
+
+
+def interactive_menu() -> None:
+    """Run the TA-facing interactive menu until the user chooses to exit."""
+    while True:
+        print("\nQuantyze Interactive Menu")
+        print("=" * 30)
+        print("1. Run default simulation with saved model")
+        print("2. Run simulation on a synthetic scenario")
+        print(f"3. Train on {SAMPLE_DATASET_PATH}")
+        print("4. Train on a custom CSV path")
+        print(f"5. View latest saved metrics from {TRAINING_METRICS_PATH}")
+        print("6. Exit")
+
+        choice = _prompt_text("Select an option (1-6): ")
+        if choice is None or choice == "6":
+            print("Exiting Quantyze.")
+            return
+
+        if choice == "1":
+            run_simulation_from_args(
+                argparse.Namespace(
+                    data=None,
+                    scenario=None,
+                    speed=0.0,
+                    train=False,
+                    port=9000,
+                    no_ui=True
+                )
+            )
+        elif choice == "2":
+            scenario = _prompt_scenario()
+            if scenario is None:
+                continue
+
+            run_simulation_from_args(
+                argparse.Namespace(
+                    data=None,
+                    scenario=scenario,
+                    speed=0.0,
+                    train=False,
+                    port=9000,
+                    no_ui=True
+                )
+            )
+        elif choice == "3":
+            _run_training_menu(SAMPLE_DATASET_PATH)
+        elif choice == "4":
+            data_path = _prompt_text("Enter the CSV path to train on (blank cancels): ")
+            if data_path is None or data_path == "":
+                print("Training cancelled.")
+                continue
+
+            _run_training_menu(data_path)
+        elif choice == "5":
+            print_saved_training_metrics()
+        else:
+            print("Invalid option. Please enter a number from 1 to 6.")
+
+
 def start_flask(app: Flask, port: int) -> None:
     """Start the Quantyze Flask application on the given port.
 
@@ -351,20 +496,20 @@ def main() -> None:
     prints final summary information.
     """
 
+    if len(sys.argv) == 1:
+        interactive_menu()
+        return
+
     args = parse_args()
 
     if args.train:
         if args.data is None:
-            raise ValueError
+            raise ValueError("Training mode requires --data <csv_path>.")
 
         train_model(args.data)
         return
-    else:
-        book, engine, stream, agent = build_system(args)
-        run_simulation(stream, agent, book)
 
-        print_summary(engine, agent)
-        book.flush_log("log.json")
+    run_simulation_from_args(args)
 
 
 if __name__ == "__main__":
