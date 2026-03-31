@@ -87,7 +87,7 @@ class OrderBookNet(nn.Module):
         self.fc2 = nn.Linear(128, 64)
         self.fc3 = nn.Linear(64, 3)
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.3)
+        self.dropout = nn.Dropout(0.2)
 
     def forward(self, x: Tensor) -> Tensor:
         """Run one forward pass; return raw logits of shape (batch, 3)."""
@@ -112,7 +112,7 @@ class Trainer:
         self.model = model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=3e-4)
         if class_weights is not None:
             class_weights = class_weights.to(self.device).float()
         self.criterion = nn.CrossEntropyLoss(weight=class_weights)
