@@ -32,6 +32,7 @@ The assignment expects a flat top-level layout. The main source files are:
 - `event_stream.py`: replay pipeline for emitting events through the engine
 - `neural_net.py`: optional ML model, trainer, and agent scaffolds
 - `main.py`: entry point for system orchestration
+- `cli_menu.py`: nested interactive terminal menu and artifact inspection helpers
 - `ui.js`: front-end or browser-side visualization entry point
 
 Project references:
