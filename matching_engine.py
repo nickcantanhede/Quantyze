@@ -221,7 +221,7 @@ class MatchingEngine:
     def _calc_slippage(expected_price: float, fills: list[dict]) -> float:
         """Return the slippage for a batch of fills."""
 
-        if fills == []:
+        if not fills:
             return 0.0
 
         total_qty = 0.0

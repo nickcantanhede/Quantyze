@@ -9,8 +9,8 @@ engine and print summary of the simulation results.
 The main module is responsible for:
 - parsing command-line arguments
 - constructing the core Quantyze system objects
-- selecting between datast replay and synthetic scenarions
-- runnig the simulation loop
+- selecting between dataset replay and synthetic scenarions
+- running the simulation loop
 - trigerring optional ML training or inference flows
 - printing final summary information and flushing logs
 
@@ -33,7 +33,6 @@ import json
 import sys
 
 import torch
-from flask import Flask
 from torch.utils.data import DataLoader as TorchDataLoader, TensorDataset
 
 from cli_menu import MenuConfig, interactive_menu as run_interactive_menu
@@ -160,7 +159,7 @@ def run_simulation(stream: EventStream, agent: Agent | None, book: OrderBook) ->
     for event in stream.source:
         fills = stream.emit(event)
 
-        if fills != []:
+        if fills:
             last_fill_price = fills[-1]["exec_price"]
             agent.step(book, last_fill_price)
 
@@ -350,8 +349,21 @@ def run_simulation_from_args(args: argparse.Namespace) -> None:
 
     run_simulation(stream, agent, book)
     print_summary(engine, agent)
-    book.flush_log(LOG_PATH)
-    print(f"Execution log written to {LOG_PATH}.")
+
+    if args.no_ui:
+        book.flush_log(LOG_PATH)
+        print(f"Execution log written to {LOG_PATH}.")
+        return
+
+    from server import create_app, run_server
+
+    app = create_app(book, engine, agent=agent, log_path=LOG_PATH)
+    print(f"Starting Quantyze API at http://127.0.0.1:{args.port} (Ctrl+C to stop, then log flushes).")
+    try:
+        run_server(app, args.port)
+    finally:
+        book.flush_log(LOG_PATH)
+        print(f"Execution log written to {LOG_PATH}.")
 
 
 def _build_menu_config() -> MenuConfig:
@@ -370,16 +382,6 @@ def _build_menu_config() -> MenuConfig:
         run_simulation=run_simulation_from_args,
         train_model=train_model
     )
-
-
-def start_flask(app: Flask, port: int) -> None:
-    """Start the Quantyze Flask application on the given port.
-
-    This function is responsible only for launching the API or UI server layer
-    after the core system has been initialized.
-    """
-
-    app.run(host='127.0.0.1', port=port, debug=False)
 
 
 def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
