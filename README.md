@@ -10,8 +10,8 @@ This repository is currently in active development.
 
 Current backend status:
 - the order book, matching engine, and event replay path compile and run
-- the synthetic `balanced` scenario now targets an active market instead of a
-  completely static non-crossing book
+- the synthetic `balanced`, `low_liquidity`, and `high_volatility` scenarios
+  are deterministic demo markets with active replay behavior
 - the training pipeline can build model-ready datasets and export normalized
   training CSV artifacts
 - the main training flow writes `latest_model.pt`,

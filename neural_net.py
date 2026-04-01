@@ -308,10 +308,18 @@ class Agent:
             "pnl": float(pnl),
         }
 
-    def total_pnl(self) -> float:
-        """Sum of ``pnl_log`` entries."""
+    def current_pnl(self) -> float:
+        """Return the latest mark-to-market P&L value, or 0.0 if no fills occurred."""
 
-        return float(sum(self.pnl_log))
+        if self.pnl_log == []:
+            return 0.0
+
+        return float(self.pnl_log[-1])
+
+    def total_pnl(self) -> float:
+        """Return the current mark-to-market P&L for backward compatibility."""
+
+        return self.current_pnl()
 
 
 def build_base_features(book: OrderBook) -> np.ndarray:
