@@ -3,10 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Quantize — Limit Order Book Simulator</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/frontend/ui.css">
+  <title>Quantyze — Limit Order Book Simulator</title>
+  <link rel="stylesheet" href="ui.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -15,7 +13,7 @@
   <!-- ── header ─────────────────────────────────────────────────────────── -->
   <header class="app-header">
     <div class="brand">
-      <span class="brand-name">Quantize</span>
+      <span class="brand-name">Quantyze</span>
       <span class="brand-sub">Limit Order Book Simulator</span>
     </div>
     <div id="status-badge" class="status-badge idle">● Idle</div>
@@ -99,7 +97,6 @@
 
           <div class="btn-row">
             <button id="sim-run-btn" class="btn btn-primary" onclick="runSimulation()">▶ Run Simulation</button>
-            <button id="sim-cancel-btn" class="btn btn-danger hidden" onclick="cancelSimulation()">■ Cancel</button>
           </div>
 
         </div><!-- /col-left -->
@@ -265,6 +262,6 @@
   </main>
 </div><!-- /#app -->
 
-<script src="/frontend/ui.js"></script>
+<script src="ui.js"></script>
 </body>
 </html>

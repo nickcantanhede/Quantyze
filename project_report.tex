@@ -71,13 +71,15 @@ matching, and train a small neural network to classify short-horizon market
 actions as buy, sell, or hold from order-book state.}
 
 The project kept the same core direction as our proposal, but the final version
-leans more on a reliable command-line simulation and training workflow than on
-a polished browser interface. That tradeoff let us spend more time on the main
-computational challenge: representing and updating a live order book
-efficiently with trees while connecting the simulator to a meaningful data and
-model-training pipeline. In the language of our original proposal, we still see
-the project as an attempt to close the gap between what a trader sees on a
-chart and what actually has to happen for an order to be filled.
+organizes the submission around a reliable browser-first workflow launched from
+\texttt{main.py}, with a terminal fallback for the same simulator and training
+logic. That let us present the project in a PyCharm-friendly way without
+changing the main computational challenge: representing and updating a live
+order book efficiently with trees while connecting the simulator to a
+meaningful data and model-training pipeline. In the language of our original
+proposal, we still see the project as an attempt to close the gap between what
+a trader sees on a chart and what actually has to happen for an order to be
+filled.
 
 \section*{2. Datasets}
 One thing that became much clearer while building the final project is that not
@@ -173,6 +175,10 @@ The intended roles of these packaged files are:
 The packaged saved-state workflow also includes a shipped baseline checkpoint
 and metrics artifact, so the TA can use the model path without retraining
 first.
+
+Because this zip is under the course upload limit, we include
+\texttt{quantyze\_datasets.zip} directly in the final MarkUs submission rather
+than asking the TA to download it from an external service.
 
 \section*{3. Computational Overview}
 \subsection*{3.1 Core Data Representation}
@@ -308,8 +314,8 @@ the packaged dataset zip, and switch the simulation overlay between the shipped
 baseline checkpoint, the latest retrained checkpoint, and no model. The active
 choice is stored in
 \texttt{active\_model.json}, which makes the training-to-simulation workflow
-persistent across runs. A browser UI is planned separately, but the current
-submission is intentionally graded through this terminal workflow.
+persistent across runs. In the final submission, the browser UI and the
+terminal fallback share the same runtime entry point in \texttt{main.py}.
 
 \subsection*{3.5 Overall Computational Complexity}
 Quantyze demonstrates computational complexity in all three major ways
@@ -325,9 +331,10 @@ highlighted by the project rubric.
     book, FIFO price-level queues, price-time-priority matching engine, and
     cancellation/indexing logic are all custom project code rather than thin
     wrappers around third-party libraries.
-    \item \textbf{Non-trivial reporting and interactivity:} the nested terminal
-    menu, saved-state workflow, metrics inspection, and execution-log reporting
-    make the program substantially more interactive than a single fixed command.
+    \item \textbf{Non-trivial reporting and interactivity:} the browser UI,
+    terminal fallback, saved-state workflow, metrics inspection, and
+    execution-log reporting make the program substantially more interactive
+    than a single fixed command.
 \end{itemize}
 
 \section*{4. Instructions for Obtaining Datasets and Running the Program}
@@ -353,8 +360,8 @@ Install the libraries listed in \texttt{requirements.txt} before running the
 program.
 
 \subsection*{4.2 Obtaining Datasets}
-Before using the packaged datasets, extract \texttt{quantyze\_datasets.zip}
-beside \texttt{main.py}. This provides:
+The TA downloads \texttt{quantyze\_datasets.zip} from our final MarkUs
+submission and extracts it beside \texttt{main.py}. This provides:
 \begin{itemize}
     \item a small internal CSV for a quick retraining check
     \item a larger internal CSV for a slower baseline-scale retraining demo
@@ -368,8 +375,8 @@ larger internal dataset and the packaged LOBSTER pair are both slower-loading
 options for a more thorough optional check.
 
 \subsection*{4.3 Workflow Overview}
-The primary grading path is the interactive menu. At each stage, it makes four
-things explicit:
+The primary grading path is the browser UI launched by running
+\texttt{main.py}. At each stage, it makes four things explicit:
 \begin{itemize}
     \item What event source is being replayed?
     \item Which checkpoint, if any, is active?
@@ -377,44 +384,49 @@ things explicit:
     \item What is the next logical action: inspect, train, or simulate?
 \end{itemize}
 
-The intended workflow starts with the guided quick demo, then branches into
-optional extra simulations or classifier retraining.
+The intended workflow starts with the default browser run, then branches into
+optional extra simulations, classifier retraining, or fallback terminal use
+through \texttt{main.py --cli}.
 
 \subsection*{4.4 Recommended TA Demo}
 The clearest way to understand the project is the following walkthrough.
 
-Run \texttt{main.py} with no additional arguments to open the nested
-interactive menu.
+Open the project in PyCharm, run \texttt{main.py} with no additional
+arguments, and open the printed local URL in a browser.
 
 We recommend the following sequence:
 \begin{enumerate}
-    \item Choose \texttt{Quick TA Demo}. This prints a short simulator-first
-    explanation, shows the current overlay status, runs the default
-    \texttt{balanced} scenario, and prints a short interpretation block.
-    \item Open \texttt{Simulation} and run \texttt{low\_liquidity} and
+    \item Start on the \texttt{Simulate} tab and run the default
+    \texttt{balanced} scenario. This is the fastest simulator-first path and
+    produces the same summary metrics described later in this section.
+    \item On the same tab, optionally run \texttt{low\_liquidity} and
     \texttt{high\_volatility}. These scenarios show that the same overlay can
     be evaluated under different event streams without changing the core
     matching engine.
-    \item Open \texttt{Training}. For a short demonstration, use
+    \item Open \texttt{Train}. For a short demonstration, use
     \texttt{sample\_internal.csv}. For a baseline-scale demonstration, use
     \texttt{huge\_internal.csv}. \\
     For the real-data path, use
     \texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}. The
     latter two are both much larger and take longer to load. After training,
-    the menu prints the latest output file paths and asks whether the new
-    checkpoint should become the active simulation overlay.
-    \item If the TA answers yes, open \texttt{Artifacts \& Metrics} and check
-    the overlay status again. The provenance should now point to the newly
-    trained checkpoint rather than the shipped baseline.
-    \item Re-run the \texttt{balanced} synthetic demo. This uses the same event
+    the UI writes the latest output files and exposes the new checkpoint in the
+    saved artifact status.
+    \item Open \texttt{Artifacts}. Check the overlay status, saved files, and
+    baseline versus latest metrics. The provenance should now point to the
+    newly trained checkpoint rather than the shipped baseline if the latest
+    model has been activated.
+    \item Open \texttt{Charts} after a simulation. This shows order-book depth
+    and execution-price history based on the replay that just ran.
+    \item Re-run the \texttt{balanced} synthetic demo under a different
+    overlay. This uses the same event
     stream as before, but under a different overlay. It helps isolate the
     difference between \textit{market replay} and \textit{agent overlay}
     behavior.
 \end{enumerate}
 
 \subsection*{4.5 How the TA Should Interpret the Output}
-The terminal output contains two different classes of information, and keeping
-them separate is the key to understanding Quantyze.
+The browser UI and direct terminal output contain the same two classes of
+information, and keeping them separate is the key to understanding Quantyze.
 
 \subsubsection*{Simulation Run Configuration}
 Before each run, the program prints:
@@ -499,7 +511,8 @@ Several parts of the final project changed in useful ways from the proposal.
 
 The simulator core became stronger and more concrete. The final system has a
 clearer separation between loading data, replaying events, matching orders,
-computing summaries, and handling the interactive menu. The BST-based order
+computing summaries, and handling both the browser UI and the terminal
+fallback. The BST-based order
 book and FIFO price-level logic were central from the beginning, but the final
 project makes their interaction much clearer.
 
@@ -510,13 +523,13 @@ pipeline with explicit features, normalization, class weighting, saved
 checkpoints, and validation metrics. In other words, the ML side became less
 open-ended and more concrete.
 
-Our display plan became more modest. The proposal emphasized a React/Plotly
-interface, but the most polished and reliable user-facing path in the final
-code is the command-line simulation, the nested terminal menu, and the
-generated training artifacts. We chose to prioritize a robust tree-based
-simulator and a reproducible training workflow over a more ambitious UI layer.
-That was a practical choice, not a change in what we thought the project was
-about.
+Our display plan also became more realistic. The proposal emphasized a more
+ambitious React/Plotly-style interface, but the final submission focuses on a
+lighter browser UI launched directly from \texttt{main.py} and backed by the
+same Python simulator and training code as the CLI fallback. We chose to
+prioritize a robust tree-based simulator and a reproducible training workflow
+over a more ambitious frontend stack. That was a practical choice, not a
+change in what we thought the project was about.
 
 The data plan also became more realistic. Instead of treating external data in
 the abstract, the final project clearly separates synthetic scenarios for
@@ -576,8 +589,8 @@ just to maximize predictive accuracy. It was to build a full computational
 pipeline from market events to order-book state to derived features to model
 output. In that sense, the ML side is successful: it uses both synthetic and
 real-data paths, produces saved checkpoints, supports inference inside the
-simulator, and can be retrained from the command line or through the
-interactive menu.
+simulator, and can be retrained from the browser UI, the command line, or the
+terminal fallback menu.
 
 We also ran into clear limitations. Synthetic data is easy to test and reason
 about, but it is not enough to justify a strong predictive claim. Real LOBSTER

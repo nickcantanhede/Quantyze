@@ -7,15 +7,15 @@ the simulator, Quantyze includes a lightweight neural-network classifier that
 can be trained on order-book features and then used as an optional inference
 overlay during simulation.
 
-The browser UI is now launched through `main.py --web`. The current TA-facing
-workflow is still intentionally terminal-first, but the frontend now shares the
-same runtime entrypoint as the CLI.
+`main.py` is the single entry point for the final project. Running it with no
+arguments launches the browser UI, which is the primary TA-facing workflow.
+The terminal menu remains available as an explicit fallback through `--cli`.
 
 ## Quickstart
 
 1. Install the libraries in `requirements.txt`.
 2. Extract `quantyze_datasets.zip` beside `main.py`.
-3. Run `main.py`.
+3. Run `main.py` in PyCharm or with `python3 main.py`.
 
 After extraction, the packaged files that appear beside `main.py` are:
 - `sample_internal.csv`
@@ -26,35 +26,39 @@ After extraction, the packaged files that appear beside `main.py` are:
 - `model.pt`
 - `training_metrics.json`
 
-The primary TA-facing workflow is the interactive menu opened by running
-`main.py` with no arguments.
+`quantyze_datasets.zip` is the single TA download artifact included in the
+final MarkUs submission. Its size is under the course upload limit, so the TA
+does not need any external download link.
 
 ## What the TA Should Run
 
 Recommended grading path:
-- run `main.py`
-- choose `Quick TA Demo`
-- optionally run `low_liquidity` and `high_volatility`
-- optionally open `Training` and run any packaged retraining option,
-  including the packaged AAPL LOBSTER message file
-- if a new model is trained, choose whether to activate it for future
-  simulations
+- run `main.py` in PyCharm
+- open the printed `http://127.0.0.1:9000` URL
+- use the `Simulate` tab for the default synthetic demo
+- optionally use the `Train` tab for packaged retraining, including the
+  packaged AAPL LOBSTER message file
+- use the `Artifacts` and `Charts` tabs to inspect saved status and market
+  outputs after a run
 
 The `huge_internal.csv` option and the packaged AAPL LOBSTER option are both
 large and can take noticeably longer to load and build training features.
 
-The simulation menu is the main way to experience the project. The training
-menu is a separate classifier workflow that writes `latest_*` artifacts and can
-then hand that checkpoint off to simulation through the overlay setting.
+The browser UI is the primary way to experience the project. The terminal menu
+is still supported through `python3 main.py --cli` if the TA prefers that path
+or wants a fallback.
 
-To open the browser frontend instead of the terminal menu:
-- run `python3 main.py --web`
+To open the browser frontend:
+- run `main.py` in PyCharm, or run `python3 main.py`
 - open `http://127.0.0.1:9000` in a browser
 - use the `Simulate`, `Train`, `Artifacts`, and `Charts` tabs
 
 If port `9000` is already in use:
-- run `python3 main.py --web --port 8080`
+- run `python3 main.py --ui --port 8080`
 - open `http://127.0.0.1:8080`
+
+To use the terminal menu instead:
+- run `python3 main.py --cli`
 
 ## Workflow Model
 
@@ -136,22 +140,28 @@ Install dependencies:
 python3 -m pip install -r requirements.txt
 ```
 
-Run the interactive menu:
+Run the browser UI:
 
 ```bash
 python3 main.py
 ```
 
-Run the browser UI:
+Run the browser UI explicitly:
 
 ```bash
-python3 main.py --web
+python3 main.py --ui
 ```
 
 Then open:
 
 ```text
 http://127.0.0.1:9000
+```
+
+Run the terminal menu:
+
+```bash
+python3 main.py --cli
 ```
 
 Run the default simulation directly:
@@ -163,19 +173,19 @@ python3 main.py --no-ui
 Train on an extracted packaged dataset directly:
 
 ```bash
-python3 main.py --train --data sample_internal.csv
+python3 main.py --no-ui --train --data sample_internal.csv
 ```
 
 ```bash
-python3 main.py --train --data huge_internal.csv
+python3 main.py --no-ui --train --data huge_internal.csv
 ```
 
 ```bash
-python3 main.py --train --data aapl_lobster_2012-06-21_message_5level_sample.csv
+python3 main.py --no-ui --train --data aapl_lobster_2012-06-21_message_5level_sample.csv
 ```
 
 Train on a custom internal CSV or raw LOBSTER message CSV:
 
 ```bash
-python3 main.py --train --data <csv_path>
+python3 main.py --no-ui --train --data <csv_path>
 ```
