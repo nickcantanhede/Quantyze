@@ -471,7 +471,7 @@ def train_model(
     with open(metrics_path, "w", encoding="utf-8") as file:
         json.dump(training_metrics, file, indent=2)
 
-    print("Training Evaluation Metrics")
+    print("Classifier Evaluation Metrics")
     print("=" * 30)
     print(f"Validation Accuracy: {training_metrics['val_accuracy']:.6f}")
     print(f"Majority Baseline Accuracy: {training_metrics['majority_baseline_accuracy']:.6f}")
@@ -496,20 +496,21 @@ def run_simulation_from_args(args: argparse.Namespace) -> None:
         model_path if isinstance(model_path, str) else None,
     )
 
-    print("Simulation Run Configuration")
+    print("Quantyze Run Configuration")
     print("=" * 30)
-    print(f"Simulation Source: {_simulation_source_label(args)}")
-    print(f"Active Model Mode: {active_model_status['mode']}")
-    print(f"Active Model Path: {active_model_status['model_path'] or 'None'}")
-    print(f"Model Provenance: {active_model_status['dataset_label']}")
+    print(f"Event Source: {_simulation_source_label(args)}")
+    print(f"Simulation Overlay Mode: {active_model_status['mode']}")
+    print(f"Simulation Overlay Path: {active_model_status['model_path'] or 'None'}")
+    print(f"Overlay Provenance: {active_model_status['dataset_label']}")
+    print("Overlay Role: optional classifier inference")
     if active_model_status["note"]:
         print(f"Note: {active_model_status['note']}")
     print("=" * 30)
 
     if agent is None:
-        print("Running without an active ML checkpoint.")
+        print("Running without a model overlay.")
     else:
-        print(f"Loaded active model checkpoint from {active_model_status['model_path']}.")
+        print(f"Loaded simulation overlay checkpoint from {active_model_status['model_path']}.")
 
     if args.data is not None:
         print(f"Replay dataset path: {args.data}")
@@ -527,9 +528,9 @@ def run_simulation_from_args(args: argparse.Namespace) -> None:
     run_simulation(stream, agent, book)
     print_summary(engine, agent)
     if agent is None:
-        print("Simulation used no active model.")
+        print("Simulation used no model overlay.")
     else:
-        print(f"Simulation used the {active_model_status['mode']} model.")
+        print(f"Simulation used the {active_model_status['mode']} overlay.")
 
     if args.no_ui:
         book.flush_log(LOG_PATH)
@@ -578,9 +579,10 @@ def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
     spread = engine.book.spread()
     mid_price = engine.book.mid_price()
 
-    print("Quantyze Summary: Matching Engine Metrics")
-    print("="*30)
-
+    print("Quantyze Summary")
+    print("=" * 30)
+    print("Simulation Metrics")
+    print("-" * 30)
     print(f"Total Filled: {metrics['total_filled']}")
     print(f"Fill Count: {metrics['fill_count']}")
     print(f"Cancel Count: {metrics['cancel_count']}")
@@ -597,7 +599,10 @@ def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
         print(f"Mid Price: {mid_price}")
 
     if agent is not None:
-        print(f"Current Mark-to-Market P&L: {agent.current_pnl()}")
+        print("-" * 30)
+        print("Agent Overlay")
+        print("-" * 30)
+        print(f"Agent Overlay Mark-to-Market P&L: {agent.current_pnl()}")
 
     print("=" * 30)
 

@@ -7,6 +7,9 @@ the simulator, Quantyze includes a lightweight neural-network classifier that
 can be trained on order-book features and then used as an optional inference
 overlay during simulation.
 
+The browser UI is a planned extension being implemented separately. The current
+TA-facing workflow is intentionally terminal-first.
+
 ## Quickstart
 
 1. Install the libraries in `requirements.txt`.
@@ -27,16 +30,15 @@ The primary TA-facing workflow is the interactive menu opened by running
 
 Recommended grading path:
 - run `main.py`
-- open `Artifacts & Metrics -> View active model status`
-- open `Simulation -> Run default synthetic demo (balanced)`
+- choose `Quick TA Demo`
 - optionally run `low_liquidity` and `high_volatility`
 - optionally open `Training` and run either packaged retraining option
 - if a new model is trained, choose whether to activate it for future
   simulations
 
 The simulation menu is the main way to experience the project. The training
-menu is a separate workflow that writes `latest_*` artifacts and can then hand
-that checkpoint off to simulation through the active-model setting.
+menu is a separate classifier workflow that writes `latest_*` artifacts and can
+then hand that checkpoint off to simulation through the overlay setting.
 
 ## Workflow Model
 
@@ -53,7 +55,7 @@ runs write:
 - `latest_training_metrics.json`
 - `latest_training_data.csv`
 
-The currently selected simulation checkpoint is stored in `active_model.json`.
+The currently selected simulation overlay is stored in `active_model.json`.
 It can be:
 - `baseline`
 - `latest`
@@ -61,17 +63,18 @@ It can be:
 
 This means simulation source and model source are intentionally separate. For
 example, the program can replay synthetic `balanced` while using either the
-packaged baseline checkpoint, the latest trained checkpoint, or no model.
+packaged baseline checkpoint, the latest trained checkpoint, or no model
+overlay.
 
 ## Important Output Interpretation
 
 Each simulation run prints two kinds of information:
 
 1. Run configuration
-- simulation source
-- active model mode
-- active model path
-- model provenance label
+- event source
+- simulation overlay mode
+- simulation overlay path
+- overlay provenance label
 
 2. Matching-engine summary
 - `Total Filled`
@@ -80,7 +83,7 @@ Each simulation run prints two kinds of information:
 - `Average Slippage`
 - `Spread`
 - `Mid Price`
-- `Current Mark-to-Market P&L` if a model is active
+- `Agent Overlay Mark-to-Market P&L` if a model is active
 
 The matching-engine metrics describe the event replay itself. The P&L line is a
 simple agent overlay metric, not a claim that the model is a profitable trading
@@ -98,7 +101,7 @@ The final submission tree is intentionally flat. The key files are:
 - `server.py`: optional Flask API helper
 - `ui.js`: optional browser-side API helper for future UI work
 - `project_report.tex`
-- `project_report.pdf`
+- `project_report.pdf` in the final submission package
 - `quantyze_datasets.zip`
 - `requirements.txt`
 - `active_model.json`

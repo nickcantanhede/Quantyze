@@ -77,10 +77,10 @@ def print_saved_training_metrics(config: MenuConfig) -> None:
     displayed_any = False
 
     displayed_any = _print_metrics_file(
-        config.training_metrics_path, "Saved Baseline Metrics"
+        config.training_metrics_path, "Packaged Baseline Classifier Metrics"
     ) or displayed_any
     displayed_any = _print_metrics_file(
-        config.latest_training_metrics_path, "Latest Training Metrics"
+        config.latest_training_metrics_path, "Latest Classifier Metrics"
     ) or displayed_any
 
     if not displayed_any:
@@ -89,13 +89,16 @@ def print_saved_training_metrics(config: MenuConfig) -> None:
 
 def print_baseline_training_metrics(config: MenuConfig) -> None:
     """Print only the packaged baseline metrics artifact."""
-    if not _print_metrics_file(config.training_metrics_path, "Saved Baseline Metrics"):
+    if not _print_metrics_file(
+        config.training_metrics_path,
+        "Packaged Baseline Classifier Metrics"
+    ):
         print(f"Baseline metrics not found at {config.training_metrics_path}.")
 
 
 def print_latest_training_metrics(config: MenuConfig) -> None:
     """Print only the newest training metrics artifact, if present."""
-    if not _print_metrics_file(config.latest_training_metrics_path, "Latest Training Metrics"):
+    if not _print_metrics_file(config.latest_training_metrics_path, "Latest Classifier Metrics"):
         print(f"Latest metrics not found at {config.latest_training_metrics_path}.")
 
 
@@ -216,18 +219,50 @@ def _path_text(path: object) -> str:
 def _print_active_model_status(config: MenuConfig) -> dict[str, object]:
     """Print the resolved active-model status and return it."""
     status = config.get_active_model_status()
-    print("Active Model Status")
+    print("Simulation Overlay Status")
     print("=" * 30)
-    print(f"Current Mode: {status['mode']}")
-    print(f"Checkpoint Path: {_path_text(status.get('model_path'))}")
-    print(f"Metrics Path: {_path_text(status.get('metrics_path'))}")
-    print(f"Provenance Label: {status.get('dataset_label', 'Unavailable')}")
-    print(f"Checkpoint Available: {status.get('checkpoint_exists', False)}")
-    print(f"State File: {_path_text(status.get('state_path'))}")
+    print(f"Current Overlay Mode: {status['mode']}")
+    print(f"Overlay Checkpoint Path: {_path_text(status.get('model_path'))}")
+    print(f"Overlay Metrics Path: {_path_text(status.get('metrics_path'))}")
+    print(f"Overlay Provenance: {status.get('dataset_label', 'Unavailable')}")
+    print(f"Overlay Checkpoint Available: {status.get('checkpoint_exists', False)}")
+    print(f"Overlay State File: {_path_text(status.get('state_path'))}")
     if status.get("note"):
         print(f"Note: {status['note']}")
     print("=" * 30)
     return status
+
+
+def _print_quick_ta_demo_intro() -> None:
+    """Print the simulator-first framing for the guided TA demo."""
+    print("Quick TA Demo")
+    print("=" * 30)
+    print("Quantyze is primarily a tree-based limit order book simulator.")
+    print("Event replay and matching-engine metrics are the main result.")
+    print("Event source and simulation overlay source are separate.")
+    print("The classifier is optional and does not drive the market.")
+    print("=" * 30)
+
+
+def _print_quick_ta_demo_followup() -> None:
+    """Print the interpretation block shown after the guided TA demo run."""
+    print("Quick Demo Interpretation")
+    print("=" * 30)
+    print("The balanced scenario is the recommended first demonstration.")
+    print("Simulation metrics describe the replay and matching engine.")
+    print("The overlay metric is secondary and not a trading-strategy claim.")
+    print("Next recommended actions:")
+    print("  - Run low_liquidity or high_volatility from Simulation")
+    print("  - Optionally train on sample_internal.csv from Training")
+    print("=" * 30)
+
+
+def _quick_ta_demo(config: MenuConfig) -> None:
+    """Run the guided simulator-first TA demo path."""
+    _print_quick_ta_demo_intro()
+    _print_active_model_status(config)
+    _run_simulation_menu(config, _build_runtime_args())
+    _print_quick_ta_demo_followup()
 
 
 def _run_simulation_menu(config: MenuConfig, args: argparse.Namespace) -> None:
@@ -251,7 +286,7 @@ def _run_training_menu(config: MenuConfig, data_path: str, packaged: bool = Fals
 
     try:
         training_result = config.train_model(data_path)
-        print("Training completed.")
+        print("Training Mode: Classifier Outputs")
         print("=" * 30)
         print(f"Dataset Used: {training_result.get('dataset_path', data_path)}")
         print(f"Latest Checkpoint Output: {training_result.get('model_output_path', config.latest_model_path)}")
@@ -269,24 +304,25 @@ def _run_training_menu(config: MenuConfig, data_path: str, packaged: bool = Fals
             f"{training_result.get('majority_baseline_accuracy', 'Unavailable')}"
         )
         print(f"Baseline checkpoint remains at {config.model_path}.")
-        print("Interactive and direct retraining still write only to the latest_* artifacts.")
+        print("Training writes only to the latest_* artifacts.")
+        print("Training does not change replay behavior by itself.")
+        print("Simulation only uses the new checkpoint if latest is activated.")
         print("=" * 30)
 
         activate_latest = _prompt_yes_no(
-            "Use this newly trained model for future simulations? [y/N]: "
+            "Use this newly trained checkpoint for future simulations? [y/N]: "
         )
         if activate_latest is None:
-            print("Active model selection cancelled; keeping the current setting.")
+            print("Overlay selection cancelled; simulation will continue using the current overlay setting.")
             return
 
         if activate_latest:
             status = config.set_active_model("latest")
-            print("Latest trained model is now active for future simulations.")
+            print("Latest checkpoint activated for future simulations.")
             if status.get("note"):
                 print(f"Note: {status['note']}")
         else:
-            status = config.get_active_model_status()
-            print(f"Active model remains set to {status['mode']}.")
+            print("Simulation will continue using the current overlay setting.")
     except (FileNotFoundError, ValueError, OSError) as exc:
         print(f"Training failed: {exc}")
     except Exception as exc:  # pragma: no cover - defensive menu guard
@@ -295,18 +331,18 @@ def _run_training_menu(config: MenuConfig, data_path: str, packaged: bool = Fals
 
 def _print_training_output_targets(config: MenuConfig) -> None:
     """Print baseline and latest training artifact destinations."""
-    print("Baseline saved-state artifacts")
+    print("Packaged baseline classifier artifacts")
     print("=" * 30)
     print(f"Checkpoint: {os.path.abspath(config.model_path)}")
     print(f"Metrics: {os.path.abspath(config.training_metrics_path)}")
     print("=" * 30)
-    print("Latest training outputs")
+    print("Latest classifier outputs")
     print("=" * 30)
     print(f"Checkpoint: {os.path.abspath(config.latest_model_path)}")
     print(f"Metrics: {os.path.abspath(config.latest_training_metrics_path)}")
     print(f"Training Data: {os.path.abspath(config.latest_training_data_path)}")
     print("Interactive and direct retraining write only to the latest_* artifacts.")
-    print(f"Persistent active-model state: {os.path.abspath(config.active_model_state_path)}")
+    print(f"Persistent overlay state: {os.path.abspath(config.active_model_state_path)}")
     print("=" * 30)
 
 
@@ -315,12 +351,13 @@ def _print_simulation_configuration(config: MenuConfig) -> None:
     status = config.get_active_model_status()
     print("Simulation Configuration")
     print("=" * 30)
-    print("Default simulation source: synthetic balanced")
-    print(f"Active model mode: {status['mode']}")
-    print(f"Active checkpoint path: {_path_text(status.get('model_path'))}")
-    print(f"Active model provenance: {status.get('dataset_label', 'Unavailable')}")
+    print("Default event source: synthetic balanced")
+    print(f"Simulation overlay mode: {status['mode']}")
+    print(f"Simulation overlay path: {_path_text(status.get('model_path'))}")
+    print(f"Overlay provenance: {status.get('dataset_label', 'Unavailable')}")
     print(f"Default execution log path: {os.path.abspath(config.log_path)}")
     print(f"Supported synthetic scenarios: {', '.join(config.scenario_choices)}")
+    print("Overlay role: optional classifier inference")
     if status.get("note"):
         print(f"Note: {status['note']}")
     print("=" * 30)
@@ -406,12 +443,17 @@ def _print_help_reference(config: MenuConfig) -> None:
     print("  - synthetic balanced = default simulation demo")
     print(f"  - {config.sample_dataset_path} = quick training demo")
     print(f"  - {config.huge_dataset_path} = larger packaged retraining demo")
-    print("  - baseline model = packaged saved checkpoint from the dataset zip")
-    print("Training and simulation are separate modes connected by the active model.")
+    print("  - model.pt = packaged baseline checkpoint")
+    print("Simulation is the main workflow; the classifier is an optional overlay.")
     print(
-        f"The active model persists across runs through {config.active_model_state_path} "
+        f"The overlay choice persists across runs through {config.active_model_state_path} "
         "and can be baseline, latest, or none."
     )
+    print("Recommended TA path:")
+    print("  - Extract quantyze_datasets.zip")
+    print("  - Run python3 main.py")
+    print("  - Choose Quick TA Demo")
+    print("The browser UI is a planned extension and is not part of the TA grading path.")
     print("Interactive menu:")
     print("  Mac/Linux: python3 main.py")
     print("  Windows:   py -3 main.py")
@@ -442,14 +484,14 @@ def _choose_active_model_menu(config: MenuConfig) -> None:
     """Run the active-model selector submenu until the user goes back."""
     while True:
         latest_available = _checkpoint_available(config.latest_model_path)
-        print("\nChoose Active Model")
+        print("\nChoose Simulation Overlay")
         print("=" * 30)
-        print(f"1. Use baseline model ({config.model_path})")
-        latest_label = f"Use latest trained model ({config.latest_model_path})"
+        print(f"1. Use packaged baseline checkpoint ({config.model_path})")
+        latest_label = f"Use latest trained checkpoint ({config.latest_model_path})"
         if not latest_available:
             latest_label += " [Unavailable]"
         print(f"2. {latest_label}")
-        print("3. Run without model")
+        print("3. Run simulation without model overlay")
         print("4. Back")
 
         choice = _prompt_text("Select an option (1-4): ")
@@ -458,7 +500,7 @@ def _choose_active_model_menu(config: MenuConfig) -> None:
 
         if choice == "1":
             status = config.set_active_model("baseline")
-            print("Baseline model selected.")
+            print("Packaged baseline checkpoint selected.")
             if status.get("note"):
                 print(f"Note: {status['note']}")
             return
@@ -467,13 +509,13 @@ def _choose_active_model_menu(config: MenuConfig) -> None:
                 print(f"Latest trained checkpoint not found at {config.latest_model_path}.")
                 continue
             status = config.set_active_model("latest")
-            print("Latest trained model selected.")
+            print("Latest trained checkpoint selected.")
             if status.get("note"):
                 print(f"Note: {status['note']}")
             return
         elif choice == "3":
             config.set_active_model("none")
-            print("Future simulations will run without a model.")
+            print("Future simulations will run without a model overlay.")
             return
         else:
             print("Invalid option. Please enter a number from 1 to 4.")
@@ -487,7 +529,7 @@ def _simulation_menu(config: MenuConfig) -> None:
         print("1. Run default synthetic demo (balanced)")
         print("2. Run synthetic scenario")
         print("3. Replay from dataset path")
-        print("4. Choose active model")
+        print("4. Choose simulation overlay")
         print("5. View current simulation configuration")
         print("6. Back")
 
@@ -560,10 +602,10 @@ def _artifacts_menu(config: MenuConfig) -> None:
     while True:
         print("\nArtifacts & Metrics Menu")
         print("=" * 30)
-        print("1. View active model status")
-        print("2. View baseline metrics")
-        print("3. View latest metrics")
-        print("4. View both baseline and latest metrics")
+        print("1. View simulation overlay status")
+        print("2. View packaged baseline classifier metrics")
+        print("3. View latest classifier metrics")
+        print("4. View both baseline and latest classifier metrics")
         print("5. View artifact status")
         print("6. View log summary")
         print("7. View dataset package contents")
@@ -614,27 +656,30 @@ def interactive_menu(config: MenuConfig) -> None:
     while True:
         print("\nQuantyze Interactive Menu")
         print("=" * 30)
-        print("1. Simulation")
-        print("2. Training")
-        print("3. Artifacts & Metrics")
-        print("4. Help / Command Reference")
-        print("5. Exit")
+        print("1. Quick TA Demo")
+        print("2. Simulation")
+        print("3. Training")
+        print("4. Artifacts & Metrics")
+        print("5. Help / Command Reference")
+        print("6. Exit")
 
-        choice = _prompt_text("Select an option (1-5): ")
-        if choice is None or choice == "5":
+        choice = _prompt_text("Select an option (1-6): ")
+        if choice is None or choice == "6":
             print("Exiting Quantyze.")
             return
 
         if choice == "1":
-            _simulation_menu(config)
+            _quick_ta_demo(config)
         elif choice == "2":
-            _training_menu(config)
+            _simulation_menu(config)
         elif choice == "3":
-            _artifacts_menu(config)
+            _training_menu(config)
         elif choice == "4":
+            _artifacts_menu(config)
+        elif choice == "5":
             _help_menu(config)
         else:
-            print("Invalid option. Please enter a number from 1 to 5.")
+            print("Invalid option. Please enter a number from 1 to 6.")
 
 
 if __name__ == '__main__':
@@ -652,6 +697,7 @@ if __name__ == '__main__':
             '_print_metrics_file', 'print_saved_training_metrics', 'print_baseline_training_metrics',
             'print_latest_training_metrics', '_prompt_text', '_prompt_scenario', '_prompt_yes_no',
             '_prompt_replay_speed', '_prompt_dataset_path', '_print_packaged_dataset_hint',
+            '_print_quick_ta_demo_intro', '_print_quick_ta_demo_followup', '_quick_ta_demo',
             '_print_active_model_status', '_run_simulation_menu', '_run_training_menu',
             '_print_training_output_targets', '_print_simulation_configuration',
             '_print_artifact_status', '_print_log_summary', '_print_dataset_package_contents',

@@ -184,7 +184,7 @@ At the end of a normal run, \texttt{main.py} prints a terminal summary with:
     \item average slippage
     \item final spread
     \item final midpoint
-    \item current mark-to-market agent P\&L if a trained agent is active
+    \item agent overlay mark-to-market P\&L if a trained checkpoint is active
 \end{itemize}
 
 The current default run path is command-line based rather than browser based.
@@ -249,19 +249,24 @@ The TA-facing interface is a nested terminal menu implemented in
 \texttt{cli\_menu.py}. Running \texttt{main.py} with no arguments opens a menu
 with separate sections for:
 \begin{itemize}
+    \item quick TA demo
     \item simulation
     \item training
     \item artifacts and metrics
     \item help / command reference
 \end{itemize}
 
-This menu lets the TA choose scenarios, replay datasets, run short training,
-inspect baseline versus latest metrics, inspect artifact status, inspect the
-current execution log, inspect the packaged dataset zip, and switch the active
-simulation model between the shipped baseline checkpoint, the latest retrained
-checkpoint, and no model. The active choice is stored in
+The quick TA demo is the recommended first path because it prints the current
+overlay status, runs the default \texttt{balanced} scenario, and explains how
+to interpret the resulting metrics. The rest of the menu lets the TA choose
+scenarios, replay datasets, run short training, inspect baseline versus latest
+metrics, inspect artifact status, inspect the current execution log, inspect
+the packaged dataset zip, and switch the simulation overlay between the shipped
+baseline checkpoint, the latest retrained checkpoint, and no model. The active
+choice is stored in
 \texttt{active\_model.json}, which makes the training-to-simulation workflow
-persistent across runs.
+persistent across runs. A browser UI is planned separately, but the current
+submission is intentionally graded through this terminal workflow.
 
 \subsection*{3.5 Overall Computational Complexity}
 Quantyze demonstrates computational complexity in all three major ways
@@ -290,13 +295,13 @@ and \textbf{model source} are separate ideas:
     \item the \textbf{simulation source} is the event stream being replayed,
     such as \texttt{balanced}, \texttt{low\_liquidity},
     \texttt{high\_volatility}, or a custom CSV
-    \item the \textbf{model source} is the checkpoint currently selected for
-    inference, such as the shipped \texttt{model.pt} baseline or a newly
-    trained \texttt{latest\_model.pt}
+    \item the \textbf{model source} is the classifier overlay currently
+    selected for inference, such as the shipped \texttt{model.pt} baseline or
+    a newly trained \texttt{latest\_model.pt}
 \end{itemize}
 
-This separation is intentional. It lets the TA test the same model under
-different market conditions and also lets the TA retrain a model without
+This separation is intentional. It lets the TA test the same classifier overlay
+under different market conditions and also lets the TA retrain a model without
 overwriting the shipped baseline artifacts.
 
 \subsection*{4.1 Installing Libraries}
@@ -318,56 +323,8 @@ at every stage:
     \item What is the next logical action: inspect, train, or simulate?
 \end{itemize}
 
-Figure 1 shows the intended workflow.
-
-\begin{figure}[h]
-\centering
-\begin{tikzpicture}[
-    scale=0.95,
-    transform shape,
-    node distance=1.0cm and 1.8cm,
-    every node/.style={font=\small},
-    box/.style={
-        rectangle,
-        rounded corners,
-        draw=black,
-        align=center,
-        text width=4.0cm,
-        minimum height=0.95cm
-    },
-    decision/.style={
-        diamond,
-        draw=black,
-        align=center,
-        aspect=2.1,
-        text width=2.8cm,
-        inner xsep=0.5em,
-        inner ysep=0.55em
-    },
-    arrow/.style={-{Latex[length=2mm]}, thick}
-]
-\node[box, text width=3.3cm] (menu) {Open \texttt{main.py}\\interactive menu};
-\node[box, below=of menu, text width=4.2cm] (status) {Inspect active model\\status if desired};
-\node[decision, below=1.1cm of status] (trainq) {Train a new\\model?};
-\node[box, below left=1.3cm and 2.8cm of trainq] (train) {Training menu\\\texttt{sample\_internal.csv}\\or \texttt{huge\_internal.csv}};
-\node[decision, below=1.2cm of train, text width=2.4cm] (activate) {Activate\\\texttt{latest} model?};
-\node[box, below=1.15cm of activate] (active) {Persist active model\\selection in\\\texttt{active\_model.json}};
-\node[box, below right=1.3cm and 2.8cm of trainq] (sim) {Simulation menu\\choose scenario\\or replay path};
-\node[box, below=1.15cm of sim, text width=4.3cm] (output) {Read run header, matching metrics,\\and agent overlay P\&L};
-
-\draw[arrow] (menu) -- (status);
-\draw[arrow] (status) -- (trainq);
-\draw[arrow] (trainq) -- node[above left] {yes} (train);
-\draw[arrow] (trainq) -- node[above right] {no} (sim);
-\draw[arrow] (train) -- (activate);
-\draw[arrow] (activate) -- (active);
-\draw[arrow] (active.east) -| ([yshift=-0.45cm]sim.west);
-\draw[arrow] (sim) -- (output);
-\end{tikzpicture}
-\caption{Recommended TA workflow: train if desired, optionally activate the new
-checkpoint, then run simulations while keeping simulation source and model
-source conceptually separate.}
-\end{figure}
+The intended workflow starts with the guided quick-demo path, then branches
+into optional extra simulations or classifier retraining.
 
 \subsection*{4.4 Recommended TA Demo}
 The following walkthrough is the clearest way to understand the final
@@ -378,29 +335,25 @@ arguments. This opens the nested interactive menu.
 
 We recommend the following sequence:
 \begin{enumerate}
-    \item Open \texttt{Artifacts \& Metrics} and choose \texttt{View active model status}. This
-    confirms the currently active mode (\texttt{baseline}, \texttt{latest}, or
-    \texttt{none}), the checkpoint path, and the model provenance label.
-    \item Open \texttt{Simulation} and run \texttt{Run default synthetic demo
-    (balanced)}. This is the cleanest first demonstration because it produces a
-    live two-sided book with real fills, a defined spread, and a defined
-    midpoint at the end of the run.
-    \item Return to \texttt{Simulation} and run \texttt{low\_liquidity} and
+    \item Choose \texttt{Quick TA Demo}. This prints a short simulator-first
+    explanation, shows the current overlay status, runs the default
+    \texttt{balanced} scenario, and prints a short interpretation block.
+    \item Open \texttt{Simulation} and run \texttt{low\_liquidity} and
     \texttt{high\_volatility}. These two scenarios demonstrate that the same
-    active model can be evaluated under different event streams without
+    overlay can be evaluated under different event streams without
     changing the core matching engine.
     \item Open \texttt{Training}. For a short demonstration, use
     \texttt{sample\_internal.csv}. For a baseline-scale demonstration, use
     \texttt{huge\_internal.csv}. After training, the menu prints the latest
     output file paths and asks whether the new checkpoint should become the
-    active simulation model.
+    active simulation overlay.
     \item If the TA answers yes, open \texttt{Artifacts \& Metrics} and check
-    \texttt{View active model status} again. The provenance should now point to
-    the newly trained checkpoint rather than the shipped baseline.
-    \item Re-run the \texttt{balanced} synthetic demo. This shows the exact same
-    event stream as before, but now under a different active model. This is the
-    simplest way to isolate the difference between \textit{market replay}
-    behavior and \textit{agent overlay} behavior.
+    the overlay status again. The provenance should now point to the newly
+    trained checkpoint rather than the shipped baseline.
+    \item Re-run the \texttt{balanced} synthetic demo. This shows the same
+    event stream as before, but now under a different overlay. This helps
+    isolate the difference between \textit{market replay} and
+    \textit{agent overlay} behavior.
 \end{enumerate}
 
 \subsection*{4.5 How the TA Should Interpret the Output}
@@ -410,17 +363,17 @@ them separate is the most important part of understanding Quantyze.
 \subsubsection*{Simulation Run Configuration}
 Before each run, the program prints:
 \begin{itemize}
-    \item the \textbf{simulation source}, such as \texttt{synthetic balanced}
+    \item the \textbf{event source}, such as \texttt{synthetic balanced}
     or a custom replay path
-    \item the \textbf{active model mode}, such as \texttt{baseline},
+    \item the \textbf{simulation overlay mode}, such as \texttt{baseline},
     \texttt{latest}, or \texttt{none}
-    \item the \textbf{active model path}
-    \item the \textbf{model provenance}, such as the packaged baseline
+    \item the \textbf{simulation overlay path}
+    \item the \textbf{overlay provenance}, such as the packaged baseline
     checkpoint or a newly trained dataset like \texttt{sample\_internal.csv}
 \end{itemize}
 
-This header tells the TA which market is being replayed and which checkpoint is
-observing it. These are intentionally not the same thing.
+This header tells the TA which market is being replayed and which classifier
+overlay, if any, is observing it. These are intentionally not the same thing.
 
 \subsubsection*{Matching-Engine Metrics}
 The following summary values describe the replay itself:
@@ -442,7 +395,7 @@ event stream is unchanged.
 
 \subsubsection*{Agent Overlay Metric}
 If an active checkpoint is loaded, the program also prints
-\texttt{Current Mark-to-Market P\&L}. This value should be read carefully.
+\texttt{Agent Overlay Mark-to-Market P\&L}. This value should be read carefully.
 
 It is \textbf{not} a claim that the model is a profitable trading strategy. In
 our current system, the neural network is trained to classify whether the
