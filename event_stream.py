@@ -85,6 +85,17 @@ class EventStream:
     def run_all(self) -> None:
         """Process each event in this stream's source until exhausted or stopped.
 
+        >>> from order_book import OrderBook
+        >>> events = [Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.0, 1.0)]
+        >>> stream = EventStream(events, MatchingEngine(OrderBook()))
+        >>> stream.run_all()
+        >>> stream.running
+        False
+        >>> stream.current_ts == events[0].timestamp
+        True
+        >>> stream.engine.book.best_bid().price
+        99.0
+
         Preconditions:
         - self.source is finite
         """

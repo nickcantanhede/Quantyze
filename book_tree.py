@@ -216,6 +216,15 @@ class BookTree:
 
         For a bid tree, this is the maximum-price node.
         For an ask tree, this is the minimum-price node.
+
+        >>> bids = BookTree('bid')
+        >>> bids.insert(PriceLevel(99.5))
+        >>> bids.insert(PriceLevel(100.0))
+        >>> bids.best().price
+        100.0
+        >>> levels = bids.inorder()
+        >>> [levels[0].price, levels[1].price]
+        [99.5, 100.0]
         """
 
         if self.root is None:

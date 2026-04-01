@@ -219,6 +219,8 @@ def _prompt_scenario(config: MenuConfig) -> str | None:
 
         print(f"Invalid scenario. Please choose one of: {scenario_text}.")
 
+    return None  # Unreachable but included for PythonTA Check
+
 
 def _prompt_yes_no(prompt: str) -> bool | None:
     """Prompt for a yes/no answer; blank defaults to no."""
@@ -236,6 +238,8 @@ def _prompt_yes_no(prompt: str) -> bool | None:
             return False
 
         print("Please answer yes or no.")
+
+    return None  # Unreachable but included for PythonTA Check
 
 
 def _prompt_replay_speed() -> float | None:
@@ -260,6 +264,8 @@ def _prompt_replay_speed() -> float | None:
 
         return speed
 
+    raise AssertionError("Unreachable: replay speed prompt loop always returns.")
+
 
 def _prompt_dataset_path(action: str) -> str | None:
     """Prompt for a dataset path or return None when cancelled."""
@@ -276,7 +282,12 @@ def _build_runtime_args(
     speed: float = 0.0,
     train: bool = False
 ) -> argparse.Namespace:
-    """Return a namespace shaped like the CLI parser output."""
+    """Return a namespace shaped like the CLI parser output.
+
+    >>> args = _build_runtime_args(scenario='balanced', speed=2.0)
+    >>> (args.scenario, args.speed, args.no_ui)
+    ('balanced', 2.0, True)
+    """
     return argparse.Namespace(
         data=data,
         scenario=scenario,

@@ -58,7 +58,23 @@ class MatchingEngine:
         self.execution_log = []
 
     def process_event(self, event: Event) -> list[dict]:
-        """Process <event> and return the fill records produced."""
+        """Process <event> and return the fill records produced.
+
+        >>> from datetime import datetime
+        >>> book = OrderBook()
+        >>> engine = MatchingEngine(book)
+        >>> engine.process_event(Event(datetime(2026, 1, 1, 9, 30), 'ask1', 'sell', 'limit', 100.0, 2.0))
+        []
+        >>> fills = engine.process_event(
+        ...     Event(datetime(2026, 1, 1, 9, 30, 1), 'buy1', 'buy', 'limit', 100.0, 1.0)
+        ... )
+        >>> fills[0]['exec_price']
+        100.0
+        >>> fills[0]['filled_qty']
+        1.0
+        >>> book.best_ask().volume
+        1.0
+        """
 
         if event.order_type == "limit":
             return self._process_limit(event)

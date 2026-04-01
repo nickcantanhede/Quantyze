@@ -375,7 +375,12 @@ def run_simulation(stream: EventStream, agent: Agent | None, book: OrderBook) ->
 
 
 def _compute_class_weights(train_labels: torch.Tensor, num_classes: int = 3) -> torch.Tensor:
-    """Return inverse-frequency class weights normalized to mean 1.0."""
+    """Return inverse-frequency class weights normalized to mean 1.0.
+
+    >>> class_weights = _compute_class_weights(torch.tensor([0, 0, 1, 2]))
+    >>> [round(float(class_weights[0]), 1), round(float(class_weights[1]), 1), round(float(class_weights[2]), 1)]
+    [0.6, 1.2, 1.2]
+    """
     counts = torch.bincount(train_labels.long(), minlength=num_classes).float()
     positive_mask = counts > 0
     weights = torch.zeros(num_classes, dtype=torch.float32)

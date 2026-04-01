@@ -60,7 +60,21 @@ def _api_health_payload() -> dict[str, str]:
 
 
 def _api_book_summary_payload(book: OrderBook, agent: Agent | None) -> dict[str, Any]:
-    """Body for ``GET /api/book/summary``."""
+    """Body for ``GET /api/book/summary``.
+
+    >>> from datetime import datetime
+    >>> from orders import Event, Order
+    >>> order_book = OrderBook()
+    >>> order_book.add_limit_order(Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.5, 1.0)))
+    >>> order_book.add_limit_order(Order(Event(datetime(2026, 1, 1, 9, 30, 1), 's1', 'sell', 'limit', 100.5, 1.0)))
+    >>> payload_example = _api_book_summary_payload(order_book, None)
+    >>> payload_example['spread']
+    1.0
+    >>> payload_example['mid_price']
+    100.0
+    >>> payload_example['agent'] is None
+    True
+    """
 
     payload: dict[str, Any] = {
         "best_bid": _price_level_top(book.best_bid()),

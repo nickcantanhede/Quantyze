@@ -35,7 +35,15 @@ def normalize_feature_vector(
     feature_mean: np.ndarray | None,
     feature_std: np.ndarray | None
 ) -> np.ndarray:
-    """Return standardized features when normalization statistics are available."""
+    """Return standardized features when normalization statistics are available.
+
+    >>> normalize_feature_vector(
+    ...     np.array([2.0, 4.0], dtype=np.float32),
+    ...     np.array([1.0, 1.0], dtype=np.float32),
+    ...     np.array([1.0, 0.0], dtype=np.float32)
+    ... ).tolist()
+    [1.0, 3.0]
+    """
     if feature_mean is None or feature_std is None:
         return features.astype(np.float32, copy=False)
 

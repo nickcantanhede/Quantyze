@@ -170,7 +170,20 @@ class PriceLevel:
         self.update_volume(delta=order.quantity)
 
     def pop_order(self) -> Order | None:
-        """Pop and return the earliest order; decrement volume by its remaining_qty."""
+        """Pop and return the earliest order; decrement volume by its remaining_qty.
+
+        >>> from datetime import datetime
+        >>> from orders import Event
+        >>> level = PriceLevel(100.0)
+        >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30), 'a1', 'sell', 'limit', 100.0, 2.0)))
+        >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30, 1), 'a2', 'sell', 'limit', 100.0, 3.0)))
+        >>> (level.volume, level.peek_order().order_id)
+        (5.0, 'a1')
+        >>> level.pop_order().order_id
+        'a1'
+        >>> level.volume
+        3.0
+        """
 
         try:
             order = self.orders.deque()

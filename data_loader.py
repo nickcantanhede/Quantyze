@@ -42,7 +42,6 @@ class ParsedLobsterRow:
     direction: int
     resting_side: str | None
 
-
 class _LobsterCache:
     """Store raw LOBSTER data and derived visualization annotations."""
 
@@ -310,7 +309,17 @@ class DataLoader:
 
     @staticmethod
     def _parse_lobster_row(row: list[str], trade_date: date) -> ParsedLobsterRow:
-        """Parse one raw LOBSTER row into a normalized data object."""
+        """Parse one raw LOBSTER row into a normalized data object.
+
+        >>> parsed_lobster = DataLoader._parse_lobster_row(
+        ...     ['34200.5', '1', '77', '10', '1005000', '1'],
+        ...     date(2026, 1, 1)
+        ... )
+        >>> (parsed_lobster.event_type, parsed_lobster.order_id, parsed_lobster.resting_side)
+        (1, '77', 'buy')
+        >>> parsed_lobster.timestamp.isoformat()
+        '2026-01-01T09:30:00.500000'
+        """
         if len(row) != 6:
             raise ValueError(f"LOBSTER rows must have exactly 6 columns, got {len(row)}.")
 
@@ -746,7 +755,15 @@ class DataLoader:
         asks: list[tuple[float, float]],
         event_side: float,
     ) -> np.ndarray:
-        """Return the public base feature vector used by training and inference."""
+        """Return the public base feature vector used by training and inference.
+
+        >>> DataLoader.feature_vector_from_levels(
+        ...     [(99.0, 3.0), (98.5, 1.0)],
+        ...     [(101.0, 1.0), (101.5, 2.0)],
+        ...     1.0
+        ... ).tolist()
+        [99.0, 3.0, 101.0, 1.0, 2.0, 100.0, 0.5, 98.5, 1.0, 101.5, 2.0, 1.0]
+        """
         return DataLoader._feature_vector_from_levels(bids, asks, event_side)
 
     @staticmethod

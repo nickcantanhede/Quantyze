@@ -149,6 +149,14 @@ class BaseOrder:
     def fill(self, qty: float) -> float:
         """Apply a fill to this order and reduce its remaining quantity.
 
+        >>> order = Order(Event(datetime(2026, 1, 1, 9, 30), 'o1', 'buy', 'limit', 100.0, 5.0))
+        >>> order.fill(2.0)
+        2.0
+        >>> order.remaining_qty
+        3.0
+        >>> order.is_complete()
+        False
+
         Preconditions:
         - qty >= 0
         - qty <= self.remaining_qty

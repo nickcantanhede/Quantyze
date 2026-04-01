@@ -51,7 +51,22 @@ class OrderBook:
         return f"{self.__class__.__name__}({self.bids}, {self.asks})"
 
     def add_limit_order(self, order: Order) -> None:
-        """Insert the order into the bid or ask BST at its limit price and register it in order_index."""
+        """Insert the order into the bid or ask BST at its limit price and register it in order_index.
+
+        >>> from datetime import datetime
+        >>> from orders import Event
+        >>> book = OrderBook()
+        >>> book.add_limit_order(
+        ...     Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.5, 3.0))
+        ... )
+        >>> book.add_limit_order(
+        ...     Order(Event(datetime(2026, 1, 1, 9, 30, 1), 's1', 'sell', 'limit', 100.5, 2.0))
+        ... )
+        >>> (book.best_bid().price, book.best_ask().price)
+        (99.5, 100.5)
+        >>> (book.spread(), book.mid_price())
+        (1.0, 100.0)
+        """
 
         price_level = PriceLevel(order.price)
         price_level.add_order(order)

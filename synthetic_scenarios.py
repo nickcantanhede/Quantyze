@@ -129,6 +129,14 @@ class _SyntheticScenarioBuilder:
 def generate_synthetic_events(scenario: str, n: int = 1000) -> list[Event]:
     """Return ``n`` synthetic events for ``scenario``.
 
+    >>> events = generate_synthetic_events('balanced', 3)
+    >>> len(events)
+    3
+    >>> (events[0].order_id, events[0].side, events[0].price)
+    ('seed_bid_0', 'buy', 99.9)
+    >>> events[1].timestamp > events[0].timestamp
+    True
+
     Preconditions:
     - scenario in {'balanced', 'low_liquidity', 'high_volatility'}
     - n >= 0
