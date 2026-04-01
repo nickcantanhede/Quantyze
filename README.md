@@ -7,8 +7,9 @@ the simulator, Quantyze includes a lightweight neural-network classifier that
 can be trained on order-book features and then used as an optional inference
 overlay during simulation.
 
-The browser UI is a planned extension being implemented separately. The current
-TA-facing workflow is intentionally terminal-first.
+The browser UI is now launched through `main.py --web`. The current TA-facing
+workflow is still intentionally terminal-first, but the frontend now shares the
+same runtime entrypoint as the CLI.
 
 ## Quickstart
 
@@ -45,6 +46,15 @@ large and can take noticeably longer to load and build training features.
 The simulation menu is the main way to experience the project. The training
 menu is a separate classifier workflow that writes `latest_*` artifacts and can
 then hand that checkpoint off to simulation through the overlay setting.
+
+To open the browser frontend instead of the terminal menu:
+- run `python3 main.py --web`
+- open `http://127.0.0.1:9000` in a browser
+- use the `Simulate`, `Train`, `Artifacts`, and `Charts` tabs
+
+If port `9000` is already in use:
+- run `python3 main.py --web --port 8080`
+- open `http://127.0.0.1:8080`
 
 ## Workflow Model
 
@@ -109,8 +119,9 @@ The final submission tree is intentionally flat. The key files are:
 - `matching_engine.py`: price-time-priority matching logic
 - `order_book.py`, `book_tree.py`, `price_level.py`: tree-based order book
 - `neural_net.py`: model, training loop, and agent
-- `server.py`: optional Flask API helper
-- `ui.js`: optional browser-side API helper for future UI work
+- `app.py`: compatibility wrapper that delegates the web UI to `main.py`
+- `server.py`: legacy post-simulation API helper kept for compatibility
+- `index.html`, `ui.css`, `ui.js`: browser-side files for the web UI
 - `project_report.tex`
 - `project_report.pdf` in the final submission package
 - `quantyze_datasets.zip`
@@ -129,6 +140,18 @@ Run the interactive menu:
 
 ```bash
 python3 main.py
+```
+
+Run the browser UI:
+
+```bash
+python3 main.py --web
+```
+
+Then open:
+
+```text
+http://127.0.0.1:9000
 ```
 
 Run the default simulation directly:

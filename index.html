@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Quantize — Limit Order Book Simulator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/frontend/ui.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── header ─────────────────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-name">Quantize</span>
+      <span class="brand-sub">Limit Order Book Simulator</span>
+    </div>
+    <div id="status-badge" class="status-badge idle">● Idle</div>
+  </header>
+
+  <!-- ── tabs ───────────────────────────────────────────────────────────── -->
+  <nav class="tab-nav" role="tablist">
+    <button class="tab-btn active" data-tab="simulate" role="tab" aria-selected="true">Simulate</button>
+    <button class="tab-btn" data-tab="train"    role="tab" aria-selected="false">Train</button>
+    <button class="tab-btn" data-tab="artifacts" role="tab" aria-selected="false">Artifacts</button>
+    <button class="tab-btn" data-tab="charts"   role="tab" aria-selected="false">Charts</button>
+  </nav>
+
+  <main class="main-content">
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         SIMULATE TAB
+    ══════════════════════════════════════════════════════════════════ -->
+    <section id="tab-simulate" class="tab-pane active" role="tabpanel">
+      <div class="two-col">
+
+        <!-- left: form -->
+        <div class="col-left">
+
+          <div class="card">
+            <div class="card-hd">Data Source</div>
+            <div class="field-group">
+              <label class="radio-row">
+                <input type="radio" name="sim-source" id="src-synthetic" value="synthetic" checked>
+                <span>Synthetic scenario</span>
+              </label>
+              <div id="synthetic-opts" class="sub-opts">
+                <select id="scenario-sel" class="sel">
+                  <option value="balanced">Balanced</option>
+                  <option value="low_liquidity">Low Liquidity</option>
+                  <option value="high_volatility">High Volatility</option>
+                </select>
+              </div>
+
+              <label class="radio-row" style="margin-top:10px">
+                <input type="radio" name="sim-source" id="src-csv" value="csv">
+                <span>CSV dataset</span>
+              </label>
+              <div id="csv-opts" class="sub-opts hidden">
+                <input type="text" id="data-path-inp" class="txt-inp" placeholder="Path to CSV file">
+                <div class="preset-row">
+                  <button class="preset-btn" data-path="sample_internal.csv">Sample</button>
+                  <button class="preset-btn" data-path="huge_internal.csv">Huge</button>
+                  <button class="preset-btn" data-path="aapl_lobster_2012-06-21_message_5level_sample.csv">LOBSTER</button>
+                </div>
+              </div>
+            </div>
+          </div><!-- /card -->
+
+          <div class="card">
+            <div class="card-hd">Replay Speed</div>
+            <div class="field-row">
+              <input type="number" id="speed-inp" class="txt-inp narrow" value="0.0" min="0" step="0.5">
+              <span class="field-hint">events/sec &nbsp;(0 = maximum speed)</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-hd">Model Overlay</div>
+            <div class="field-group">
+              <label class="radio-row">
+                <input type="radio" name="sim-overlay" value="baseline" checked>
+                <span>Baseline checkpoint</span>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="sim-overlay" value="latest">
+                <span>Latest trained checkpoint</span>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="sim-overlay" value="none">
+                <span>No overlay</span>
+              </label>
+              <div id="overlay-note" class="field-hint" style="margin-top:6px"></div>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button id="sim-run-btn" class="btn btn-primary" onclick="runSimulation()">▶ Run Simulation</button>
+            <button id="sim-cancel-btn" class="btn btn-danger hidden" onclick="cancelSimulation()">■ Cancel</button>
+          </div>
+
+        </div><!-- /col-left -->
+
+        <!-- right: output + results -->
+        <div class="col-right">
+
+          <div id="sim-output-panel" class="hidden">
+            <div class="card">
+              <div class="card-hd">
+                Execution Output
+                <span id="sim-pct" class="pct-label"></span>
+              </div>
+              <div id="sim-prog-wrap" class="prog-wrap hidden">
+                <div class="prog-bar"><div id="sim-prog-fill" class="prog-fill"></div></div>
+              </div>
+              <pre id="sim-log" class="log-box" aria-live="polite"></pre>
+            </div>
+          </div>
+
+          <div id="sim-results-panel" class="hidden">
+            <!-- populated by renderSimResults() -->
+          </div>
+
+        </div><!-- /col-right -->
+      </div><!-- /two-col -->
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         TRAIN TAB
+    ══════════════════════════════════════════════════════════════════ -->
+    <section id="tab-train" class="tab-pane" role="tabpanel">
+      <div class="two-col">
+
+        <div class="col-left">
+
+          <div class="card">
+            <div class="card-hd">Training Dataset</div>
+            <div class="field-group">
+              <label class="radio-row">
+                <input type="radio" name="train-src" value="sample" checked>
+                <span>Sample <span class="muted">— sample_internal.csv</span></span>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="train-src" value="huge">
+                <span>Huge <span class="muted">— huge_internal.csv (slower)</span></span>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="train-src" value="lobster">
+                <span>LOBSTER <span class="muted">— AAPL 2012 (slower)</span></span>
+              </label>
+              <label class="radio-row">
+                <input type="radio" name="train-src" value="custom">
+                <span>Custom CSV path</span>
+              </label>
+              <input type="text" id="train-path-inp" class="txt-inp hidden" placeholder="Path to CSV file" style="margin-top:6px">
+            </div>
+          </div>
+
+          <div class="card info-card">
+            <div class="card-hd">What Happens During Training</div>
+            <ul class="info-list">
+              <li>Replays events → extracts 16 order-book features per event</li>
+              <li>Labels each step: buy / sell / hold (50-event lookahead)</li>
+              <li>80 % train · 20 % validation split (random seed 111)</li>
+              <li>3-layer MLP · 50 epochs · Adam optimizer (lr = 3e-4)</li>
+              <li>Saves checkpoint → <code>latest_model.pt</code></li>
+              <li>Saves metrics → <code>latest_training_metrics.json</code></li>
+            </ul>
+          </div>
+
+          <div class="btn-row">
+            <button id="train-run-btn" class="btn btn-primary" onclick="runTraining()">▶ Start Training</button>
+          </div>
+
+        </div><!-- /col-left -->
+
+        <div class="col-right">
+
+          <div id="train-output-panel" class="hidden">
+            <div class="card">
+              <div class="card-hd">
+                Training Output
+                <span id="train-pct" class="pct-label"></span>
+              </div>
+              <div id="train-prog-wrap" class="prog-wrap hidden">
+                <div class="prog-bar"><div id="train-prog-fill" class="prog-fill indeterminate"></div></div>
+              </div>
+              <pre id="train-log" class="log-box" aria-live="polite"></pre>
+            </div>
+          </div>
+
+          <div id="train-results-panel" class="hidden">
+            <!-- populated by renderTrainResults() -->
+          </div>
+
+        </div><!-- /col-right -->
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         ARTIFACTS TAB
+    ══════════════════════════════════════════════════════════════════ -->
+    <section id="tab-artifacts" class="tab-pane" role="tabpanel">
+      <div id="artifacts-body">
+        <div class="loading-msg">Loading artifacts…</div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         CHARTS TAB  (Phase 2)
+    ══════════════════════════════════════════════════════════════════ -->
+    <section id="tab-charts" class="tab-pane" role="tabpanel">
+
+      <div id="charts-empty" class="empty-state">
+        <p>Run a simulation first to view market graphs.</p>
+      </div>
+
+      <div id="charts-body" class="hidden">
+        <div class="charts-grid">
+
+          <div class="card chart-card">
+            <div class="card-hd">Order Book Depth</div>
+            <div class="chart-wrap">
+              <canvas id="depth-chart"></canvas>
+            </div>
+          </div>
+
+          <div class="card chart-card">
+            <div class="card-hd">Execution Prices — Fill History</div>
+            <div class="chart-wrap">
+              <canvas id="fills-chart"></canvas>
+            </div>
+          </div>
+
+        </div><!-- /charts-grid -->
+
+        <div class="card" style="margin-top:16px">
+          <div class="card-hd">
+            Recent Fills
+            <span id="fills-count" class="pct-label"></span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" id="fills-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Side</th>
+                  <th>Exec Price</th>
+                  <th>Filled Qty</th>
+                  <th>Remaining Qty</th>
+                  <th>Maker ID</th>
+                </tr>
+              </thead>
+              <tbody id="fills-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div><!-- /charts-body -->
+    </section>
+
+  </main>
+</div><!-- /#app -->
+
+<script src="/frontend/ui.js"></script>
+</body>
+</html>
