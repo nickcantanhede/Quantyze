@@ -19,6 +19,8 @@ TA-facing workflow is intentionally terminal-first.
 After extraction, the packaged files that appear beside `main.py` are:
 - `sample_internal.csv`
 - `huge_internal.csv`
+- `aapl_lobster_2012-06-21_message_5level_sample.csv`
+- `aapl_lobster_2012-06-21_orderbook_5level_sample.csv`
 - `instructions.txt`
 - `model.pt`
 - `training_metrics.json`
@@ -32,9 +34,13 @@ Recommended grading path:
 - run `main.py`
 - choose `Quick TA Demo`
 - optionally run `low_liquidity` and `high_volatility`
-- optionally open `Training` and run either packaged retraining option
+- optionally open `Training` and run any packaged retraining option,
+  including the packaged AAPL LOBSTER message file
 - if a new model is trained, choose whether to activate it for future
   simulations
+
+The `huge_internal.csv` option and the packaged AAPL LOBSTER option are both
+large and can take noticeably longer to load and build training features.
 
 The simulation menu is the main way to experience the project. The training
 menu is a separate classifier workflow that writes `latest_*` artifacts and can
@@ -47,7 +53,12 @@ There are three different concepts in the final project:
 - `balanced`, `low_liquidity`, and `high_volatility` are synthetic simulation
   sources
 - `sample_internal.csv` is the short retraining demo
-- `huge_internal.csv` is the larger packaged retraining demo
+- `huge_internal.csv` is the larger packaged retraining demo and takes longer
+  to load
+- `aapl_lobster_2012-06-21_message_5level_sample.csv` is the packaged raw
+  LOBSTER message file, paired with its extracted orderbook file
+- `aapl_lobster_2012-06-21_orderbook_5level_sample.csv` is the paired
+  packaged LOBSTER orderbook file
 
 The shipped baseline model is the packaged checkpoint `model.pt`. New training
 runs write:
@@ -134,6 +145,10 @@ python3 main.py --train --data sample_internal.csv
 
 ```bash
 python3 main.py --train --data huge_internal.csv
+```
+
+```bash
+python3 main.py --train --data aapl_lobster_2012-06-21_message_5level_sample.csv
 ```
 
 Train on a custom internal CSV or raw LOBSTER message CSV:

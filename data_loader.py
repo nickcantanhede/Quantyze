@@ -42,6 +42,7 @@ class ParsedLobsterRow:
     direction: int
     resting_side: str | None
 
+
 class _LobsterCache:
     """Store raw LOBSTER data and derived visualization annotations."""
 
