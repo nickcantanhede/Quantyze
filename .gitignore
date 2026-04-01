@@ -37,3 +37,5 @@ log.json
 *.log
 *.xdv
 *.synctex.gz
+
+skills/
