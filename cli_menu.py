@@ -43,6 +43,7 @@ class MenuDatasets:
 
     sample_dataset_path: str
     huge_dataset_path: str
+    lobster_sample_message_path: str
     scenario_choices: tuple[str, ...]
 
 
@@ -108,6 +109,11 @@ class MenuConfig:
     def huge_dataset_path(self) -> str:
         """Return the packaged larger dataset path."""
         return self.datasets.huge_dataset_path
+
+    @property
+    def lobster_sample_message_path(self) -> str:
+        """Return the packaged LOBSTER message-file path."""
+        return self.datasets.lobster_sample_message_path
 
     @property
     def scenario_choices(self) -> tuple[str, ...]:
@@ -384,6 +390,11 @@ def _run_training_menu(config: MenuConfig, data_path: str, packaged: bool = Fals
             print(f"Could not find dataset at {data_path}.")
         return
 
+    if data_path == config.huge_dataset_path:
+        print("Note: this packaged internal dataset is very large and may take a while to load and train.")
+    elif data_path == config.lobster_sample_message_path:
+        print("Note: this packaged LOBSTER dataset is very large and may take a while to load and build.")
+
     try:
         training_result = config.train_model(data_path)
         print("Training Mode: Classifier Outputs")
@@ -540,7 +551,11 @@ def _print_help_reference(config: MenuConfig) -> None:
     print("Workflow roles:")
     print("  - synthetic balanced = default simulation demo")
     print(f"  - {config.sample_dataset_path} = quick training demo")
-    print(f"  - {config.huge_dataset_path} = larger packaged retraining demo")
+    print(f"  - {config.huge_dataset_path} = larger packaged retraining demo (large; slower to load)")
+    print(
+        f"  - {config.lobster_sample_message_path} = packaged raw LOBSTER message file "
+        "(paired orderbook file included; large; slower to load)"
+    )
     print("  - model.pt = packaged baseline checkpoint")
     print("Simulation is the main workflow; the classifier is an optional overlay.")
     print(
@@ -551,6 +566,7 @@ def _print_help_reference(config: MenuConfig) -> None:
     print("  - Extract quantyze_datasets.zip")
     print("  - Run python3 main.py")
     print("  - Choose Quick TA Demo")
+    print("  - Optionally open Training and choose the packaged AAPL LOBSTER message file")
     print("The browser UI is a planned extension and is not part of the TA grading path.")
     print("Interactive menu:")
     print("  Mac/Linux: python3 main.py")
@@ -564,13 +580,16 @@ def _print_help_reference(config: MenuConfig) -> None:
     print("Train on packaged huge dataset:")
     print(f"  Mac/Linux: python3 main.py --train --data {config.huge_dataset_path}")
     print(f"  Windows:   py -3 main.py --train --data {config.huge_dataset_path}")
+    print("Train on packaged AAPL LOBSTER message file:")
+    print(f"  Mac/Linux: python3 main.py --train --data {config.lobster_sample_message_path}")
+    print(f"  Windows:   py -3 main.py --train --data {config.lobster_sample_message_path}")
     print("Train on a custom dataset:")
     print("  Mac/Linux: python3 main.py --train --data <csv_path>")
     print("  Windows:   py -3 main.py --train --data <csv_path>")
     print("Dataset package note:")
     print(
         f"  Extract {DATASET_PACKAGE_PATH} beside main.py before using packaged "
-        "sample or huge training options."
+        "sample, huge, or AAPL LOBSTER training options."
     )
     print("Supported dataset types:")
     print("  - internal Quantyze CSV")
@@ -671,13 +690,17 @@ def _training_menu(config: MenuConfig) -> None:
         print("\nTraining Menu")
         print("=" * 30)
         print(f"1. Quick retraining demo on {config.sample_dataset_path}")
-        print(f"2. Retrain baseline-scale model on {config.huge_dataset_path}")
-        print("3. Train on a custom dataset path")
-        print("4. View training output targets")
-        print("5. Back")
+        print(f"2. Retrain baseline-scale model on {config.huge_dataset_path} [large; slower to load]")
+        print(
+            "3. Train on packaged AAPL LOBSTER message file "
+            f"({config.lobster_sample_message_path}) [large; slower to load]"
+        )
+        print("4. Train on a custom dataset path")
+        print("5. View training output targets")
+        print("6. Back")
 
-        choice = _prompt_text("Select an option (1-5): ")
-        if choice is None or choice == "5":
+        choice = _prompt_text("Select an option (1-6): ")
+        if choice is None or choice == "6":
             return
 
         if choice == "1":
@@ -685,14 +708,16 @@ def _training_menu(config: MenuConfig) -> None:
         elif choice == "2":
             _run_training_menu(config, config.huge_dataset_path, packaged=True)
         elif choice == "3":
+            _run_training_menu(config, config.lobster_sample_message_path, packaged=True)
+        elif choice == "4":
             data_path = _prompt_dataset_path("train on")
             if data_path is None:
                 continue
             _run_training_menu(config, data_path)
-        elif choice == "4":
+        elif choice == "5":
             _print_training_output_targets(config)
         else:
-            print("Invalid option. Please enter a number from 1 to 5.")
+            print("Invalid option. Please enter a number from 1 to 6.")
 
 
 def _artifacts_menu(config: MenuConfig) -> None:

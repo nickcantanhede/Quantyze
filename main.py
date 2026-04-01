@@ -50,6 +50,7 @@ LOG_PATH = "log.json"
 ACTIVE_MODEL_STATE_PATH = "active_model.json"
 SAMPLE_DATASET_PATH = "sample_internal.csv"
 HUGE_DATASET_PATH = "huge_internal.csv"
+LOBSTER_SAMPLE_MESSAGE_PATH = "aapl_lobster_2012-06-21_message_5level_sample.csv"
 SCENARIO_CHOICES = ("balanced", "low_liquidity", "high_volatility")
 ACTIVE_MODEL_MODES = ("baseline", "latest", "none")
 BASELINE_MODEL_LABEL = "packaged baseline checkpoint"
@@ -171,7 +172,7 @@ def _dataset_label_for_path(dataset_path: str | None) -> str:
         return "unknown"
 
     dataset_name = os.path.basename(dataset_path)
-    if dataset_name in {SAMPLE_DATASET_PATH, HUGE_DATASET_PATH}:
+    if dataset_name in {SAMPLE_DATASET_PATH, HUGE_DATASET_PATH, LOBSTER_SAMPLE_MESSAGE_PATH}:
         return dataset_name
 
     return f"custom ({dataset_name})"
@@ -696,6 +697,7 @@ def _build_menu_config() -> MenuConfig:
         datasets=MenuDatasets(
             sample_dataset_path=SAMPLE_DATASET_PATH,
             huge_dataset_path=HUGE_DATASET_PATH,
+            lobster_sample_message_path=LOBSTER_SAMPLE_MESSAGE_PATH,
             scenario_choices=SCENARIO_CHOICES,
         ),
         callbacks=MenuCallbacks(

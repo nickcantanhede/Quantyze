@@ -77,8 +77,18 @@ order book efficiently with trees while connecting that simulation to a
 meaningful data and model-training pipeline.
 
 \section*{2. Datasets}
-Quantyze uses two kinds of datasets during development and one packaged dataset
-zip for grading.
+Quantyze uses three distinct \textbf{data-source roles}, and keeping those
+roles separate is important for understanding the final submission:
+\begin{itemize}
+    \item \textbf{synthetic scenarios} for simulator-first replay demos
+    \item \textbf{packaged internal CSVs} for fast and reproducible classifier
+    retraining
+    \item \textbf{paired raw LOBSTER files} for the real-data preprocessing and
+    feature-building path
+\end{itemize}
+
+The final submission also includes a packaged dataset zip so that the TA does
+not need to download anything externally before running the project.
 
 \subsection*{2.1 Synthetic Event Data}
 We generated our own synthetic event streams for testing and demonstration. These
@@ -91,24 +101,27 @@ are created inside \texttt{data\_loader.py} and include three scenarios:
 
 These synthetic datasets use the same canonical event format as the rest of the
 project: \texttt{timestamp}, \texttt{order\_id}, \texttt{side},
-\texttt{order\_type}, \texttt{price}, and \texttt{quantity}. The synthetic data
-is useful because it gives us a deterministic way to demonstrate fills,
-cancellations, and changing book state without requiring a large external
-download.
+\texttt{order\_type}, \texttt{price}, and \texttt{quantity}. Their role is
+\textbf{simulation}, not packaged retraining. They are the fastest way for the
+TA to see fills, cancellations, spread changes, and book updates without
+waiting on a large dataset load.
 
 \subsection*{2.2 LOBSTER Sample Data}
 For the real-data path of the machine learning portion of the project, we used
 LOBSTER sample order-book data from the official LOBSTER sample page.\footnote{\url{https://data.lobsterdata.com/info/DataSamples.php}}
-LOBSTER provides two paired files:
+LOBSTER data is fundamentally a \textbf{paired-file format}. Each sample
+provides:
 \begin{itemize}
     \item a message file containing timestamped market events
     \item an order-book file containing depth snapshots
 \end{itemize}
 
-Our code supports raw LOBSTER message and order-book CSVs. From the message
-file, we use normalized information corresponding to timestamp, event type,
-order id, size, price, and direction. The loader also recognizes message types
-that should be preserved as annotations rather than replayed directly.
+Our code supports raw LOBSTER message and order-book CSVs. The TA points the
+training flow at the \textbf{message file}, and our loader infers the paired
+order-book file automatically from the filename. From the message file, we use
+normalized information corresponding to timestamp, event type, order id, size,
+price, and direction. The loader also recognizes message types that should be
+preserved as annotations rather than replayed directly.
 
 From the paired order-book file, our current feature pipeline uses only the top
 two bid levels and top two ask levels, even when a file contains deeper book
@@ -116,10 +129,17 @@ data. This means the model ultimately trains on level-1 and level-2 price/size
 information rather than the full book.
 
 We used public LOBSTER sample files such as AAPL, AMZN, and GOOG during
-development to validate the real-data pipeline. However, for the final shipped
-saved state in this submission, we use packaged internal-format data so that the
-TA can reproduce the workflow quickly without depending on external market-data
-downloads.
+development to validate the real-data pipeline. In the final submission, we now
+ship one official Apple 5-level sample pair inside the dataset zip using the
+clearer extracted filenames:
+\begin{itemize}
+    \item \texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}
+    \item \texttt{aapl\_lobster\_2012-06-21\_orderbook\_5level\_sample.csv}
+\end{itemize}
+
+This packaged LOBSTER option is intentionally \textbf{optional}. It is useful
+for demonstrating the real-data pipeline, but it is much larger and slower to
+load than the short internal packaged dataset.
 
 \subsection*{2.3 Submission Dataset Package}
 For the final submission, the dataset zip is \texttt{quantyze\_datasets.zip}. It
@@ -127,15 +147,26 @@ contains:
 \begin{itemize}
     \item \texttt{sample\_internal.csv}
     \item \texttt{huge\_internal.csv}
+    \item \texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}
+    \item \texttt{aapl\_lobster\_2012-06-21\_orderbook\_5level\_sample.csv}
     \item \texttt{instructions.txt}
     \item \texttt{model.pt}
     \item \texttt{training\_metrics.json}
 \end{itemize}
 
-The small sample dataset is meant for a short under-one-minute training check.
-The larger internal dataset is a baseline-scale retraining demo. The packaged
-saved-state workflow also includes a shipped baseline checkpoint and metrics so
-that the TA can use the model path without retraining first.
+The intended roles of these packaged files are:
+\begin{itemize}
+    \item \texttt{sample\_internal.csv}: the \textbf{quick} retraining check
+    \item \texttt{huge\_internal.csv}: the \textbf{large internal} retraining
+    demo, which takes longer to load and train
+    \item \texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}: the
+    \textbf{large raw LOBSTER message-file} demo
+    \item \texttt{aapl\_lobster\_2012-06-21\_orderbook\_5level\_sample.csv}:
+    the paired order-book file required by the raw LOBSTER path
+\end{itemize}
+
+The packaged saved-state workflow also includes a shipped baseline checkpoint
+and metrics so that the TA can use the model path without retraining first.
 
 \section*{3. Computational Overview}
 \subsection*{3.1 Core Data Representation}
@@ -310,8 +341,18 @@ program.
 
 \subsection*{4.2 Obtaining Datasets}
 Before using the packaged datasets, extract \texttt{quantyze\_datasets.zip}
-beside \texttt{main.py}. This provides the small verification dataset, the
-larger saved-state dataset, and the baseline saved artifacts.
+beside \texttt{main.py}. This provides:
+\begin{itemize}
+    \item a small internal CSV for a quick retraining check
+    \item a larger internal CSV for a slower baseline-scale retraining demo
+    \item a packaged Apple LOBSTER \textbf{message file} and its paired
+    \textbf{order-book file}
+    \item the baseline checkpoint and metrics artifacts
+\end{itemize}
+
+The short TA path should start with \texttt{sample\_internal.csv}. The larger
+internal dataset and the packaged LOBSTER pair are both slower-loading options
+meant for a more thorough optional check.
 
 \subsection*{4.3 Workflow Overview}
 The primary grading path is the interactive menu, which answers four questions
@@ -344,9 +385,11 @@ We recommend the following sequence:
     changing the core matching engine.
     \item Open \texttt{Training}. For a short demonstration, use
     \texttt{sample\_internal.csv}. For a baseline-scale demonstration, use
-    \texttt{huge\_internal.csv}. After training, the menu prints the latest
-    output file paths and asks whether the new checkpoint should become the
-    active simulation overlay.
+    \texttt{huge\_internal.csv}. For the real-data path, use
+    \texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}. The
+    latter two are both much larger and take longer to load. After training,
+    the menu prints the latest output file paths and asks whether the new
+    checkpoint should become the active simulation overlay.
     \item If the TA answers yes, open \texttt{Artifacts \& Metrics} and check
     the overlay status again. The provenance should now point to the newly
     trained checkpoint rather than the shipped baseline.
@@ -425,10 +468,16 @@ They do not directly measure whether the simulated agent will earn positive
 P\&L on every synthetic scenario.
 
 \subsection*{4.6 Optional Raw LOBSTER Check}
-If the TA wants to test the raw LOBSTER path, they can use the custom dataset
-option from the interactive menu and provide a LOBSTER message CSV path. The
-paired order-book path is inferred from the message filename by replacing
-\texttt{\_message\_} with \texttt{\_orderbook\_}.
+If the TA wants to test the raw LOBSTER path, they do \textbf{not} need to
+download external files. They can use the packaged training-menu option for
+\texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}. The paired
+order-book path is inferred automatically from that message filename, which
+maps to
+\texttt{aapl\_lobster\_2012-06-21\_orderbook\_5level\_sample.csv}.
+
+The same loader logic also works for a custom raw LOBSTER message CSV path: it
+infers the paired order-book path by replacing \texttt{\_message\_} with
+\texttt{\_orderbook\_}.
 
 \section*{5. Changes from Proposal to Final Submission}
 Several parts of the final project changed from our proposal.
@@ -453,10 +502,11 @@ the generated training artifacts. We chose to prioritize a robust tree-based
 simulator and reproducible training path over a more ambitious UI layer.
 
 Finally, our data plan became more realistic. Instead of relying only on
-synthetic data or describing external data abstractly, the final project
-supports both generated scenarios and raw LOBSTER files, while the saved-state
-submission workflow is based on packaged internal data so the TA does not need a
-large external retraining step.
+synthetic data or describing external data abstractly, the final project now
+separates three roles clearly: synthetic scenarios for replay, packaged
+internal CSVs for fast reproducible retraining, and a packaged raw LOBSTER pair
+for the real-data preprocessing path. This keeps the TA workflow self-contained
+while still showing that the project can process real market data.
 
 \section*{6. Discussion}
 Our project goal was to model the mechanics of a limit order book using trees
