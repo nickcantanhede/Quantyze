@@ -141,6 +141,28 @@ class MenuConfig:
         return self.callbacks.set_active_model
 
 
+def _format_metric_text(value: object) -> str:
+    """Return a short printable representation for metrics and status values."""
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    if isinstance(value, list):
+        if all(isinstance(item, (int, float)) and not isinstance(item, bool) for item in value):
+            return "[" + ", ".join(_format_metric_text(item) for item in value) + "]"
+    return str(value)
+
+
+def _overlay_mode_text(mode: object) -> str:
+    """Return a human-readable overlay mode label."""
+    labels = {"baseline": "Baseline", "latest": "Latest", "none": "None"}
+    if isinstance(mode, str):
+        return labels.get(mode, mode.title())
+    return str(mode)
+
+
 def _print_metrics_file(path: str, heading: str) -> bool:
     """Print one metrics artifact; return whether the file was displayed."""
     try:
@@ -157,9 +179,12 @@ def _print_metrics_file(path: str, heading: str) -> bool:
 
     print(heading)
     print("=" * 30)
-    print(f"Validation Accuracy: {metrics.get('val_accuracy', 'Unavailable')}")
-    print(f"Majority Baseline Accuracy: {metrics.get('majority_baseline_accuracy', 'Unavailable')}")
-    print(f"Per-Class Recall: {metrics.get('per_class_recall', 'Unavailable')}")
+    print(f"Validation Accuracy: {_format_metric_text(metrics.get('val_accuracy', 'Unavailable'))}")
+    print(
+        "Majority Baseline Accuracy: "
+        f"{_format_metric_text(metrics.get('majority_baseline_accuracy', 'Unavailable'))}"
+    )
+    print(f"Per-Class Recall: {_format_metric_text(metrics.get('per_class_recall', 'Unavailable'))}")
     print(f"Confusion Matrix: {metrics.get('confusion_matrix', 'Unavailable')}")
     if 'dataset_path' in metrics:
         print(f"Dataset Path: {metrics['dataset_path']}")
@@ -329,11 +354,11 @@ def _print_active_model_status(config: MenuConfig) -> dict[str, object]:
     status = config.get_active_model_status()
     print("Simulation Overlay Status")
     print("=" * 30)
-    print(f"Current Overlay Mode: {status['mode']}")
+    print(f"Current Overlay Mode: {_overlay_mode_text(status['mode'])}")
     print(f"Overlay Checkpoint Path: {_path_text(status.get('model_path'))}")
     print(f"Overlay Metrics Path: {_path_text(status.get('metrics_path'))}")
     print(f"Overlay Provenance: {status.get('dataset_label', 'Unavailable')}")
-    print(f"Overlay Checkpoint Available: {status.get('checkpoint_exists', False)}")
+    print(f"Overlay Checkpoint Available: {_format_metric_text(status.get('checkpoint_exists', False))}")
     print(f"Overlay State File: {_path_text(status.get('state_path'))}")
     if status.get("note"):
         print(f"Note: {status['note']}")
@@ -409,10 +434,10 @@ def _run_training_menu(config: MenuConfig, data_path: str, packaged: bool = Fals
             "Latest Training Data Output: "
             f"{training_result.get('training_data_output_path', config.latest_training_data_path)}"
         )
-        print(f"Validation Accuracy: {training_result.get('val_accuracy', 'Unavailable')}")
+        print(f"Validation Accuracy: {_format_metric_text(training_result.get('val_accuracy', 'Unavailable'))}")
         print(
             "Majority Baseline Accuracy: "
-            f"{training_result.get('majority_baseline_accuracy', 'Unavailable')}"
+            f"{_format_metric_text(training_result.get('majority_baseline_accuracy', 'Unavailable'))}"
         )
         print(f"Baseline checkpoint remains at {config.model_path}.")
         print("Training writes only to the latest_* artifacts.")
@@ -461,7 +486,7 @@ def _print_sim_config(config: MenuConfig) -> None:
     print("Simulation Configuration")
     print("=" * 30)
     print("Default event source: synthetic balanced")
-    print(f"Simulation overlay mode: {status['mode']}")
+    print(f"Simulation overlay mode: {_overlay_mode_text(status['mode'])}")
     print(f"Simulation overlay path: {_path_text(status.get('model_path'))}")
     print(f"Overlay provenance: {status.get('dataset_label', 'Unavailable')}")
     print(f"Default execution log path: {os.path.abspath(config.log_path)}")

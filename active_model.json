@@ -1,6 +1,7 @@
 {
-  "mode": "none",
-  "model_path": null,
-  "metrics_path": null,
-  "dataset_label": "No active model"
+  "mode": "baseline",
+  "model_path": "model.pt",
+  "metrics_path": "training_metrics.json",
+  "dataset_label": "packaged baseline checkpoint",
+  "user_selected": false
 }

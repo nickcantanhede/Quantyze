@@ -237,7 +237,8 @@ saved-state artifacts extracted from the dataset zip, and runtime logs such as:
 The machine learning pipeline is built mainly in \texttt{data\_loader.py},
 \texttt{neural\_net.py}, and \texttt{main.py}.
 
-The current feature pipeline uses 16 features per example:
+The feature pipeline uses 12 features per example, extracted by
+\texttt{DataLoader.\_feature\_vector\_from\_levels}:
 \begin{enumerate}
     \item best bid price
     \item best bid size
@@ -251,20 +252,25 @@ The current feature pipeline uses 16 features per example:
     \item second ask price
     \item second ask size
     \item event-side feature
-    \item one-step best bid delta
-    \item one-step best ask delta
-    \item one-step mid-price delta
-    \item one-step imbalance delta
 \end{enumerate}
 
-The label policy is horizon-based. For each example, we compare the current
-midpoint to the midpoint 50 events later:
+The label policy is a \textbf{next-changed-mid rule}, implemented in
+\texttt{DataLoader.\_labels\_from\_mid\_sequence}. For each example, we scan
+forward through the mid-price sequence until the midpoint changes by a
+non-zero amount:
 \begin{itemize}
-    \item if the future midpoint is more than \$0.01 higher, the label is
+    \item if the next observed change is an increase, the label is
     \texttt{buy}
-    \item if it is more than \$0.01 lower, the label is \texttt{sell}
-    \item otherwise the label is \texttt{hold}
+    \item if the next observed change is a decrease, the label is
+    \texttt{sell}
+    \item if no change is observed within the remaining sequence, the label
+    is \texttt{hold}
 \end{itemize}
+
+This rule labels each snapshot with the direction of the very next midpoint
+move, rather than comparing against a fixed future horizon. It avoids an
+arbitrary look-ahead window and produces a label that is directly tied to
+the next price-relevant event in the replay.
 
 This pipeline is implemented in \texttt{DataLoader.build\_training\_dataset} and
 related helper methods. The final training flow in \texttt{main.py} computes
@@ -450,8 +456,8 @@ If an active checkpoint is loaded, the program also prints
 carefully.
 
 It is \textbf{not} a claim that the model is a profitable trading strategy. In
-the current system, the neural network is trained to classify whether the
-midpoint will move up, down, or stay roughly flat 50 events later. During
+the current system, the neural network is trained to classify the direction of the next
+non-zero midpoint change: buy, sell, or hold. During
 simulation, that prediction is converted into a simple paper-trading overlay
 that increments or decrements inventory by one unit whenever the simulator
 observes fills. As a result:

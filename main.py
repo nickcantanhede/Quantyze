@@ -48,6 +48,7 @@ LATEST_TRAINING_METRICS_PATH = "latest_training_metrics.json"
 LATEST_TRAINING_DATA_PATH = "latest_training_data.csv"
 LOG_PATH = "log.json"
 ACTIVE_MODEL_STATE_PATH = "active_model.json"
+DATASET_PACKAGE_PATH = "quantyze_datasets.zip"
 SAMPLE_DATASET_PATH = "sample_internal.csv"
 HUGE_DATASET_PATH = "huge_internal.csv"
 LOBSTER_SAMPLE_MESSAGE_PATH = "aapl_lobster_2012-06-21_message_5level_sample.csv"
@@ -166,6 +167,52 @@ def _checkpoint_exists(path: str | None) -> bool:
     return path is not None and os.path.exists(path) and os.path.getsize(path) > 0
 
 
+def _format_decimal(value: float) -> str:
+    """Return ``value`` formatted to two decimal places."""
+    return f"{value:.2f}"
+
+
+def _format_metric(value: object) -> str:
+    """Return a short printable representation for numeric metrics."""
+    if isinstance(value, bool):
+        return "Yes" if value else "No"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return _format_decimal(value)
+    return str(value)
+
+
+def _format_optional_path(path: object) -> str:
+    """Return an absolute path for strings, or ``None`` when not available."""
+    if not isinstance(path, str) or path == "":
+        return "None"
+    return os.path.abspath(path)
+
+
+def _overlay_mode_text(mode: object) -> str:
+    """Return a human-readable overlay mode label."""
+    labels = {"baseline": "Baseline", "latest": "Latest", "none": "None"}
+    if isinstance(mode, str):
+        return labels.get(mode, mode.title())
+    return str(mode)
+
+
+def _default_active_model_mode() -> str:
+    """Return the shipped default overlay mode for this environment."""
+    return "baseline" if _checkpoint_exists(MODEL_PATH) else "none"
+
+
+def _default_no_model_note() -> str:
+    """Return the clearest note for runs without an available default checkpoint."""
+    if os.path.exists(DATASET_PACKAGE_PATH):
+        return (
+            "No packaged checkpoint is available yet. Extract "
+            f"{DATASET_PACKAGE_PATH} beside main.py to enable the baseline overlay."
+        )
+    return "No packaged checkpoint is available; running without a model."
+
+
 def _dataset_label_for_path(dataset_path: str | None) -> str:
     """Return a short human-readable label for a dataset path."""
     if not dataset_path:
@@ -193,7 +240,11 @@ def _dataset_label_from_metrics(metrics_path: str, fallback: str) -> str:
     return _dataset_label_for_path(dataset_path)
 
 
-def _active_model_payload(mode: str, dataset_label: str | None = None) -> dict[str, object]:
+def _active_model_payload(
+    mode: str,
+    dataset_label: str | None = None,
+    user_selected: bool = False,
+) -> dict[str, object]:
     """Return the persisted payload for the selected active-model mode."""
     if mode == "baseline":
         return {
@@ -201,6 +252,7 @@ def _active_model_payload(mode: str, dataset_label: str | None = None) -> dict[s
             "model_path": MODEL_PATH,
             "metrics_path": TRAINING_METRICS_PATH,
             "dataset_label": dataset_label or BASELINE_MODEL_LABEL,
+            "user_selected": user_selected,
         }
     if mode == "latest":
         latest_label = dataset_label or _dataset_label_from_metrics(
@@ -212,6 +264,7 @@ def _active_model_payload(mode: str, dataset_label: str | None = None) -> dict[s
             "model_path": LATEST_MODEL_PATH,
             "metrics_path": LATEST_TRAINING_METRICS_PATH,
             "dataset_label": latest_label,
+            "user_selected": user_selected,
         }
     if mode == "none":
         return {
@@ -219,6 +272,7 @@ def _active_model_payload(mode: str, dataset_label: str | None = None) -> dict[s
             "model_path": None,
             "metrics_path": None,
             "dataset_label": dataset_label or "No active model",
+            "user_selected": user_selected,
         }
 
     raise ValueError(f"Unsupported active model mode: {mode}")
@@ -239,6 +293,10 @@ def _load_active_model_payload() -> dict[str, object] | None:
     if mode not in ACTIVE_MODEL_MODES:
         return None
 
+    user_selected = payload.get("user_selected")
+    if user_selected is not None and not isinstance(user_selected, bool):
+        return None
+
     return payload
 
 
@@ -253,9 +311,13 @@ def _saved_dataset_label(payload: dict[str, object] | None) -> str | None:
     return None
 
 
-def save_active_model_selection(mode: str, dataset_label: str | None = None) -> dict[str, object]:
+def save_active_model_selection(
+    mode: str,
+    dataset_label: str | None = None,
+    user_selected: bool = True,
+) -> dict[str, object]:
     """Persist and return the selected active-model payload."""
-    payload = _active_model_payload(mode, dataset_label)
+    payload = _active_model_payload(mode, dataset_label, user_selected=user_selected)
     with open(ACTIVE_MODEL_STATE_PATH, "w", encoding="utf-8") as file:
         json.dump(payload, file, indent=2)
     return payload
@@ -265,35 +327,59 @@ def resolve_active_model_status() -> dict[str, object]:
     """Return the resolved active-model status, applying safe fallbacks."""
     raw_payload = _load_active_model_payload()
     note = ""
+    default_mode = _default_active_model_mode()
+    explicit_selection = False
 
     if raw_payload is None:
-        requested_mode = "baseline" if _checkpoint_exists(MODEL_PATH) else "none"
-        note = "Active model state was missing or invalid; using the default selection."
+        requested_mode = default_mode
+        if default_mode == "baseline":
+            note = "Active model state was missing or invalid; using the packaged baseline model."
+        else:
+            note = _default_no_model_note()
     else:
-        requested_mode = str(raw_payload["mode"])
+        explicit_selection = bool(raw_payload.get("user_selected"))
+        if explicit_selection:
+            requested_mode = str(raw_payload["mode"])
+        else:
+            requested_mode = default_mode
+            if str(raw_payload["mode"]) != default_mode:
+                if default_mode == "baseline":
+                    note = "No explicit overlay selection was found; using the packaged baseline model."
+                else:
+                    note = _default_no_model_note()
 
     if requested_mode == "latest":
         if _checkpoint_exists(LATEST_MODEL_PATH):
-            resolved_payload = _active_model_payload("latest", _saved_dataset_label(raw_payload))
+            resolved_payload = _active_model_payload(
+                "latest",
+                _saved_dataset_label(raw_payload),
+                user_selected=explicit_selection,
+            )
         elif _checkpoint_exists(MODEL_PATH):
-            resolved_payload = _active_model_payload("baseline")
+            resolved_payload = _active_model_payload("baseline", user_selected=explicit_selection)
             note = "Latest checkpoint was unavailable; fell back to the baseline model."
         else:
-            resolved_payload = _active_model_payload("none")
+            resolved_payload = _active_model_payload("none", user_selected=explicit_selection)
             note = "Latest checkpoint was unavailable; running without a model."
     elif requested_mode == "baseline":
         if _checkpoint_exists(MODEL_PATH):
-            resolved_payload = _active_model_payload("baseline")
+            resolved_payload = _active_model_payload("baseline", user_selected=explicit_selection)
         else:
-            resolved_payload = _active_model_payload("none")
+            resolved_payload = _active_model_payload("none", user_selected=explicit_selection)
             note = "Baseline checkpoint was unavailable; running without a model."
     else:
-        resolved_payload = _active_model_payload("none")
+        resolved_payload = _active_model_payload("none", user_selected=explicit_selection)
 
-    if raw_payload != resolved_payload:
+    should_persist_resolved_state = (
+        raw_payload is None
+        or explicit_selection
+        or (raw_payload is not None and "user_selected" not in raw_payload)
+    )
+    if raw_payload != resolved_payload and should_persist_resolved_state:
         save_active_model_selection(
             str(resolved_payload["mode"]),
             _saved_dataset_label(resolved_payload),
+            user_selected=bool(resolved_payload.get("user_selected")),
         )
 
     model_path = resolved_payload["model_path"]
@@ -308,7 +394,7 @@ def resolve_active_model_status() -> dict[str, object]:
 
 def set_active_model_selection(mode: str) -> dict[str, object]:
     """Persist a requested mode and return the resolved active-model status."""
-    save_active_model_selection(mode)
+    save_active_model_selection(mode, user_selected=True)
     return resolve_active_model_status()
 
 
@@ -632,8 +718,8 @@ def run_simulation_from_args(args: argparse.Namespace) -> None:
     print("Quantyze Run Configuration")
     print("=" * 30)
     print(f"Event Source: {_simulation_source_label(args)}")
-    print(f"Simulation Overlay Mode: {active_model_status['mode']}")
-    print(f"Simulation Overlay Path: {active_model_status['model_path'] or 'None'}")
+    print(f"Simulation Overlay Mode: {_overlay_mode_text(active_model_status['mode'])}")
+    print(f"Simulation Overlay Path: {_format_optional_path(active_model_status['model_path'])}")
     print(f"Overlay Provenance: {active_model_status['dataset_label']}")
     print("Overlay Role: optional classifier inference")
     if active_model_status["note"]:
@@ -724,26 +810,26 @@ def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
     print("=" * 30)
     print("Simulation Metrics")
     print("-" * 30)
-    print(f"Total Filled: {metrics['total_filled']}")
-    print(f"Fill Count: {metrics['fill_count']}")
-    print(f"Cancel Count: {metrics['cancel_count']}")
-    print(f"Average Slippage: {metrics.get('average_slippage', 0.0)}")
+    print(f"Total Filled: {_format_metric(metrics['total_filled'])}")
+    print(f"Fill Count: {_format_metric(metrics['fill_count'])}")
+    print(f"Cancel Count: {_format_metric(metrics['cancel_count'])}")
+    print(f"Average Slippage: {_format_metric(metrics.get('average_slippage', 0.0))}")
 
     if spread is None:
         print("Spread: Unavailable")
     else:
-        print(f"Spread: {spread}")
+        print(f"Spread: {_format_decimal(spread)}")
 
     if mid_price is None:
         print("Mid Price: Unavailable")
     else:
-        print(f"Mid Price: {mid_price}")
+        print(f"Mid Price: {_format_decimal(mid_price)}")
 
     if agent is not None:
         print("-" * 30)
         print("Agent Overlay")
         print("-" * 30)
-        print(f"Agent Overlay Mark-to-Market P&L: {agent.current_pnl()}")
+        print(f"Agent Overlay Mark-to-Market P&L: {_format_decimal(agent.current_pnl())}")
 
     print("=" * 30)
 
