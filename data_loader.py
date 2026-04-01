@@ -19,9 +19,8 @@ from __future__ import annotations
 import csv
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import TypedDict
 
 import numpy as np
 
@@ -31,8 +30,9 @@ from orders import Event
 from synthetic_scenarios import generate_synthetic_events
 
 
-class ParsedLobsterRow(TypedDict):
-    """Typed representation of one normalized raw LOBSTER message row."""
+@dataclass
+class ParsedLobsterRow:
+    """Parsed representation of one normalized raw LOBSTER message row."""
 
     timestamp: datetime
     event_type: int
@@ -43,13 +43,24 @@ class ParsedLobsterRow(TypedDict):
     resting_side: str | None
 
 
-@dataclass
 class _LobsterCache:
     """Store raw LOBSTER data and derived visualization annotations."""
 
-    raw_rows: list[list[str]] = field(default_factory=list)
-    raw_orderbook_rows: list[list[float]] = field(default_factory=list)
-    special_events: list[dict[str, object]] = field(default_factory=list)
+    raw_rows: list[list[str]]
+    raw_orderbook_rows: list[list[float]]
+    special_events: list[dict[str, object]]
+
+    def __init__(
+        self,
+        raw_rows: list[list[str]] | None = None,
+        raw_orderbook_rows: list[list[float]] | None = None,
+        special_events: list[dict[str, object]] | None = None,
+    ) -> None:
+
+        """Initialize cached LOBSTER rows and derived annotations."""
+        self.raw_rows = [] if raw_rows is None else raw_rows
+        self.raw_orderbook_rows = [] if raw_orderbook_rows is None else raw_orderbook_rows
+        self.special_events = [] if special_events is None else special_events
 
 
 class DataLoader:
@@ -299,7 +310,7 @@ class DataLoader:
 
     @staticmethod
     def _parse_lobster_row(row: list[str], trade_date: date) -> ParsedLobsterRow:
-        """Parse one raw LOBSTER row into a normalized dictionary."""
+        """Parse one raw LOBSTER row into a normalized data object."""
         if len(row) != 6:
             raise ValueError(f"LOBSTER rows must have exactly 6 columns, got {len(row)}.")
 
@@ -315,18 +326,18 @@ class DataLoader:
 
         timestamp = datetime.combine(trade_date, datetime.min.time()) + timedelta(seconds=time_seconds)
 
-        parsed: ParsedLobsterRow = {
-            "timestamp": timestamp,
-            "event_type": event_type,
-            "order_id": order_id,
-            "size": size,
-            "price_int": price_int,
-            "direction": direction,
-            "resting_side": None,
-        }
+        parsed = ParsedLobsterRow(
+            timestamp=timestamp,
+            event_type=event_type,
+            order_id=order_id,
+            size=size,
+            price_int=price_int,
+            direction=direction,
+            resting_side=None,
+        )
 
         if event_type != 7:
-            parsed["resting_side"] = DataLoader._lobster_direction_to_side(direction)
+            parsed.resting_side = DataLoader._lobster_direction_to_side(direction)
 
         return parsed
 
@@ -338,12 +349,12 @@ class DataLoader:
         events because they are surfaced as visualization annotations instead.
         """
         parsed = DataLoader._parse_lobster_row(row, trade_date)
-        event_type = parsed["event_type"]
-        timestamp = parsed["timestamp"]
-        order_id = parsed["order_id"]
-        size = parsed["size"]
-        price_int = parsed["price_int"]
-        resting_side = parsed["resting_side"]
+        event_type = parsed.event_type
+        timestamp = parsed.timestamp
+        order_id = parsed.order_id
+        size = parsed.size
+        price_int = parsed.price_int
+        resting_side = parsed.resting_side
 
         if event_type in {1, 2, 3, 4, 5} and resting_side is None:
             raise ValueError(f"LOBSTER event type {event_type} is missing a resting side.")
@@ -375,12 +386,12 @@ class DataLoader:
     ) -> dict | None:
         """Convert one raw LOBSTER row into a visualization annotation, if applicable."""
         parsed = DataLoader._parse_lobster_row(row, trade_date)
-        event_type = parsed["event_type"]
-        timestamp = parsed["timestamp"]
-        price_int = parsed["price_int"]
-        size = parsed["size"]
-        direction = parsed["direction"]
-        resting_side = parsed["resting_side"]
+        event_type = parsed.event_type
+        timestamp = parsed.timestamp
+        price_int = parsed.price_int
+        size = parsed.size
+        direction = parsed.direction
+        resting_side = parsed.resting_side
 
         if event_type == 6:
             return {
@@ -799,7 +810,7 @@ if __name__ == '__main__':
 
     python_ta.check_all(config={
         'extra-imports': [
-            'csv', 'os', 're', 'dataclasses', 'datetime', 'typing', 'numpy',
+            'csv', 'os', 're', 'dataclasses', 'datetime', 'numpy',
             'matching_engine', 'order_book', 'orders', 'synthetic_scenarios',
             'doctest', 'python_ta'
         ],
