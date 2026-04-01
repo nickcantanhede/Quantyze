@@ -46,39 +46,44 @@
 \vspace{1.2em}
 
 \section*{1. Introduction}
-Financial market interfaces often compress a complex matching process into a
-simple price chart. For a casual trader, it is easy to think that if a stock is
-currently shown at a certain price, then any order can be filled immediately at
-that exact level. In reality, that is only true when there is enough available
-liquidity at the relevant price levels and when the order can move through the
-queue with acceptable slippage. The gap between a visible market price and an
-actual fill price is one of the most important practical ideas in market
-microstructure, and it is also a good setting for applying the tree-based data
-structures and simulation techniques from CSC111.
+As a group of CS students interested in finance, we have spent a lot of time
+looking at stock charts. It does not take long to notice a major disconnect
+between the price shown on the screen and the mechanics operating underneath
+it. A market interface may display a stock at a certain level, but that does
+not mean an order can be filled there instantly or in unlimited size. In
+practice, fills depend on liquidity, queue position, and the slippage created
+when an order moves through the book.
 
-Our project studies this gap by simulating a limit order book in pure Python. We
-model bids and asks as separate binary search trees of price levels, maintain
-FIFO priority within each level, replay event streams through a matching engine,
-and compute summary statistics about fills, cancellations, spread, midpoint,
-and slippage. On top of the simulator, we added a lightweight machine learning
-component that observes book-state features and classifies a short-horizon
-market action.
+That gap between a quoted price and an executable price is one of the main
+ideas that motivated this project. It is also a very natural place to apply
+CSC111 ideas such as tree-based data structures, simulation, and algorithmic
+state updates. Quantyze studies that gap by simulating a limit order book in
+pure Python. We represent bids and asks as separate binary search trees of
+price levels, maintain FIFO priority within each level, replay event streams
+through a matching engine, and compute summary statistics about fills,
+cancellations, spread, midpoint, and slippage. On top of the simulator, we
+added a small machine learning component that observes book-state
+features and classifies market actions in the short term.
 
 \textbf{Our project goal is to build a tree-based market simulator that can
 replay realistic order flow, expose the mechanics of price-time-priority
 matching, and train a small neural network to classify short-horizon market
 actions as buy, sell, or hold from order-book state.}
 
-This final submission keeps the core direction from our proposal, but the final
-product is more grounded in a robust command-line simulation and training
-workflow than in a polished browser interface. That shift let us focus on the
-central computational challenge of the project: representing and updating a live
-order book efficiently with trees while connecting that simulation to a
-meaningful data and model-training pipeline.
+The project kept the same core direction as our proposal, but the final version
+leans more on a reliable command-line simulation and training workflow than on
+a polished browser interface. That tradeoff let us spend more time on the main
+computational challenge: representing and updating a live order book
+efficiently with trees while connecting the simulator to a meaningful data and
+model-training pipeline. In the language of our original proposal, we still see
+the project as an attempt to close the gap between what a trader sees on a
+chart and what actually has to happen for an order to be filled.
 
 \section*{2. Datasets}
-Quantyze uses three distinct \textbf{data-source roles}, and keeping those
-roles separate is important for understanding the final submission:
+One thing that became much clearer while building the final project is that not
+all data in Quantyze plays the same role. Quantyze uses three distinct
+\textbf{data-source roles}, and separating them clearly makes the rest of the
+system much easier to follow:
 \begin{itemize}
     \item \textbf{synthetic scenarios} for simulator-first replay demos
     \item \textbf{packaged internal CSVs} for fast and reproducible classifier
@@ -87,12 +92,13 @@ roles separate is important for understanding the final submission:
     feature-building path
 \end{itemize}
 
-The final submission also includes a packaged dataset zip so that the TA does
-not need to download anything externally before running the project.
+The submission also includes a packaged dataset zip, so the TA does not need to
+download anything externally before running the project. That was important to
+us because we wanted the grading path to be self-contained and easy to repeat.
 
 \subsection*{2.1 Synthetic Event Data}
-We generated our own synthetic event streams for testing and demonstration. These
-are created inside \texttt{data\_loader.py} and include three scenarios:
+We generated our own synthetic event streams for testing and demonstration.
+These are created inside \texttt{data\_loader.py} and include three scenarios:
 \begin{itemize}
     \item \texttt{balanced}
     \item \texttt{low\_liquidity}
@@ -104,20 +110,19 @@ project: \texttt{timestamp}, \texttt{order\_id}, \texttt{side},
 \texttt{order\_type}, \texttt{price}, and \texttt{quantity}. Their role is
 \textbf{simulation}, not packaged retraining. They are the fastest way for the
 TA to see fills, cancellations, spread changes, and book updates without
-waiting on a large dataset load.
+waiting for a large dataset to load.
 
 \subsection*{2.2 LOBSTER Sample Data}
 For the real-data path of the machine learning portion of the project, we used
 LOBSTER sample order-book data from the official LOBSTER sample page.\footnote{\url{https://data.lobsterdata.com/info/DataSamples.php}}
-LOBSTER data is fundamentally a \textbf{paired-file format}. Each sample
-provides:
+Each LOBSTER sample comes as a \textbf{pair of files}:
 \begin{itemize}
     \item a message file containing timestamped market events
     \item an order-book file containing depth snapshots
 \end{itemize}
 
-Our code supports raw LOBSTER message and order-book CSVs. The TA points the
-training flow at the \textbf{message file}, and our loader infers the paired
+Our code supports raw LOBSTER message and order-book CSVs. The training flow is
+pointed at the \textbf{message file}, and the loader infers the paired
 order-book file automatically from the filename. From the message file, we use
 normalized information corresponding to timestamp, event type, order id, size,
 price, and direction. The loader also recognizes message types that should be
@@ -125,21 +130,21 @@ preserved as annotations rather than replayed directly.
 
 From the paired order-book file, our current feature pipeline uses only the top
 two bid levels and top two ask levels, even when a file contains deeper book
-data. This means the model ultimately trains on level-1 and level-2 price/size
-information rather than the full book.
+data. In practice, the model ultimately trains on level-1 and level-2
+price/size information rather than the full book.
 
-We used public LOBSTER sample files such as AAPL, AMZN, and GOOG during
-development to validate the real-data pipeline. In the final submission, we now
-ship one official Apple 5-level sample pair inside the dataset zip using the
-clearer extracted filenames:
+During development, we used public LOBSTER sample files such as AAPL, AMZN, and
+GOOG to validate the real-data pipeline. In the final submission, we ship one
+official Apple 5-level sample pair inside the dataset zip using the clearer
+extracted filenames:
 \begin{itemize}
     \item \texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}
     \item \texttt{aapl\_lobster\_2012-06-21\_orderbook\_5level\_sample.csv}
 \end{itemize}
 
-This packaged LOBSTER option is intentionally \textbf{optional}. It is useful
-for demonstrating the real-data pipeline, but it is much larger and slower to
-load than the short internal packaged dataset.
+This packaged LOBSTER option is \textbf{optional}. It demonstrates the
+real-data pipeline, but it is much larger and slower to load than the short
+internal packaged dataset.
 
 \subsection*{2.3 Submission Dataset Package}
 For the final submission, the dataset zip is \texttt{quantyze\_datasets.zip}. It
@@ -166,7 +171,8 @@ The intended roles of these packaged files are:
 \end{itemize}
 
 The packaged saved-state workflow also includes a shipped baseline checkpoint
-and metrics so that the TA can use the model path without retraining first.
+and metrics artifact, so the TA can use the model path without retraining
+first.
 
 \section*{3. Computational Overview}
 \subsection*{3.1 Core Data Representation}
@@ -219,7 +225,7 @@ At the end of a normal run, \texttt{main.py} prints a terminal summary with:
 \end{itemize}
 
 The current default run path is command-line based rather than browser based.
-This means the project reports results through terminal output, the packaged
+The project therefore reports results through terminal output, the packaged
 saved-state artifacts extracted from the dataset zip, and runtime logs such as:
 \begin{itemize}
     \item \texttt{model.pt}
@@ -319,9 +325,9 @@ highlighted by the project rubric.
 \end{itemize}
 
 \section*{4. Instructions for Obtaining Datasets and Running the Program}
-Our TA-facing run path is designed as a workflow rather than as a collection of
-independent commands. The key distinction is that \textbf{simulation source}
-and \textbf{model source} are separate ideas:
+The TA-facing run path is organized as a workflow rather than a list of
+independent commands. The most important distinction is that
+\textbf{simulation source} and \textbf{model source} are separate:
 \begin{itemize}
     \item the \textbf{simulation source} is the event stream being replayed,
     such as \texttt{balanced}, \texttt{low\_liquidity},
@@ -331,9 +337,10 @@ and \textbf{model source} are separate ideas:
     a newly trained \texttt{latest\_model.pt}
 \end{itemize}
 
-This separation is intentional. It lets the TA test the same classifier overlay
-under different market conditions and also lets the TA retrain a model without
-overwriting the shipped baseline artifacts.
+Keeping them separate lets the TA test the same classifier overlay under
+different market conditions and retrain a model without overwriting the shipped
+baseline artifacts. We found this distinction important because the simulator
+is the core system, while the model is an optional layer on top of it.
 
 \subsection*{4.1 Installing Libraries}
 Install the libraries listed in \texttt{requirements.txt} before running the
@@ -350,13 +357,13 @@ beside \texttt{main.py}. This provides:
     \item the baseline checkpoint and metrics artifacts
 \end{itemize}
 
-The short TA path should start with \texttt{sample\_internal.csv}. The larger
-internal dataset and the packaged LOBSTER pair are both slower-loading options
-meant for a more thorough optional check.
+The shortest TA path should start with \texttt{sample\_internal.csv}. The
+larger internal dataset and the packaged LOBSTER pair are both slower-loading
+options for a more thorough optional check.
 
 \subsection*{4.3 Workflow Overview}
-The primary grading path is the interactive menu, which answers four questions
-at every stage:
+The primary grading path is the interactive menu. At each stage, it makes four
+things explicit:
 \begin{itemize}
     \item What event source is being replayed?
     \item Which checkpoint, if any, is active?
@@ -364,15 +371,14 @@ at every stage:
     \item What is the next logical action: inspect, train, or simulate?
 \end{itemize}
 
-The intended workflow starts with the guided quick-demo path, then branches
-into optional extra simulations or classifier retraining.
+The intended workflow starts with the guided quick demo, then branches into
+optional extra simulations or classifier retraining.
 
 \subsection*{4.4 Recommended TA Demo}
-The following walkthrough is the clearest way to understand the final
-submission.
+The clearest way to understand the project is the following walkthrough.
 
-To use this path, the TA should run \texttt{main.py} with no additional
-arguments. This opens the nested interactive menu.
+Run \texttt{main.py} with no additional arguments to open the nested
+interactive menu.
 
 We recommend the following sequence:
 \begin{enumerate}
@@ -380,9 +386,9 @@ We recommend the following sequence:
     explanation, shows the current overlay status, runs the default
     \texttt{balanced} scenario, and prints a short interpretation block.
     \item Open \texttt{Simulation} and run \texttt{low\_liquidity} and
-    \texttt{high\_volatility}. These two scenarios demonstrate that the same
-    overlay can be evaluated under different event streams without
-    changing the core matching engine.
+    \texttt{high\_volatility}. These scenarios show that the same overlay can
+    be evaluated under different event streams without changing the core
+    matching engine.
     \item Open \texttt{Training}. For a short demonstration, use
     \texttt{sample\_internal.csv}. For a baseline-scale demonstration, use
     \texttt{huge\_internal.csv}. For the real-data path, use
@@ -393,15 +399,15 @@ We recommend the following sequence:
     \item If the TA answers yes, open \texttt{Artifacts \& Metrics} and check
     the overlay status again. The provenance should now point to the newly
     trained checkpoint rather than the shipped baseline.
-    \item Re-run the \texttt{balanced} synthetic demo. This shows the same
-    event stream as before, but now under a different overlay. This helps
-    isolate the difference between \textit{market replay} and
-    \textit{agent overlay} behavior.
+    \item Re-run the \texttt{balanced} synthetic demo. This uses the same event
+    stream as before, but under a different overlay. It helps isolate the
+    difference between \textit{market replay} and \textit{agent overlay}
+    behavior.
 \end{enumerate}
 
 \subsection*{4.5 How the TA Should Interpret the Output}
 The terminal output contains two different classes of information, and keeping
-them separate is the most important part of understanding Quantyze.
+them separate is the key to understanding Quantyze.
 
 \subsubsection*{Simulation Run Configuration}
 Before each run, the program prints:
@@ -416,7 +422,8 @@ Before each run, the program prints:
 \end{itemize}
 
 This header tells the TA which market is being replayed and which classifier
-overlay, if any, is observing it. These are intentionally not the same thing.
+overlay, if any, is observing it. They are related, but they are not the same
+thing.
 
 \subsubsection*{Matching-Engine Metrics}
 The following summary values describe the replay itself:
@@ -433,19 +440,20 @@ The following summary values describe the replay itself:
 
 These values are properties of the event stream and the matching engine. If the
 TA replays the same scenario with \texttt{baseline}, \texttt{latest}, and
-\texttt{none}, these market metrics should stay the same because the underlying
+\texttt{none}, the market metrics should stay the same because the underlying
 event stream is unchanged.
 
 \subsubsection*{Agent Overlay Metric}
 If an active checkpoint is loaded, the program also prints
-\texttt{Agent Overlay Mark-to-Market P\&L}. This value should be read carefully.
+\texttt{Agent Overlay Mark-to-Market P\&L}. This value needs to be interpreted
+carefully.
 
 It is \textbf{not} a claim that the model is a profitable trading strategy. In
-our current system, the neural network is trained to classify whether the
+the current system, the neural network is trained to classify whether the
 midpoint will move up, down, or stay roughly flat 50 events later. During
-simulation, this prediction is converted into a simple paper-trading overlay
+simulation, that prediction is converted into a simple paper-trading overlay
 that increments or decrements inventory by one unit whenever the simulator
-observes fills. Therefore:
+observes fills. As a result:
 \begin{itemize}
     \item a strong classification accuracy does not automatically imply a strong
     trading P\&L
@@ -456,7 +464,7 @@ observes fills. Therefore:
 \end{itemize}
 
 For example, \texttt{low\_liquidity} often ends with a wider spread and fewer
-fills than \texttt{balanced}. A model can therefore finish with a non-zero
+fills than \texttt{balanced}. A model can therefore finish with non-zero
 inventory and a negative mark-to-market value even when the matching engine
 itself is behaving correctly.
 
@@ -480,123 +488,102 @@ infers the paired order-book path by replacing \texttt{\_message\_} with
 \texttt{\_orderbook\_}.
 
 \section*{5. Changes from Proposal to Final Submission}
-Several parts of the final project changed from our proposal.
+Several parts of the final project changed in useful ways from the proposal.
 
-First, the simulator core became stronger and more complete than the proposal
-version. The final system now has a clearer separation between loading data,
-replaying events, matching orders, computing summaries, and handling the
-interactive menu. The binary-search-tree order book and FIFO price-level logic
-remained central from the start, but the final project is much more concrete in
-how those structures interact.
+The simulator core became stronger and more concrete. The final system has a
+clearer separation between loading data, replaying events, matching orders,
+computing summaries, and handling the interactive menu. The BST-based order
+book and FIFO price-level logic were central from the beginning, but the final
+project makes their interaction much clearer.
 
-Second, our machine learning plan changed. In the proposal, we described either
-a decision-tree or neural-network style predictor in a relatively open-ended
-way. In the final submission, we committed to a PyTorch neural network and built
-a full training pipeline with explicit features, normalization, class weighting,
-saved checkpoints, and validation metrics.
+The machine learning plan also became more specific. In the proposal, we left
+room for either a decision-tree or neural-network predictor. In the final
+submission, we committed to a PyTorch neural network and built a full training
+pipeline with explicit features, normalization, class weighting, saved
+checkpoints, and validation metrics. In other words, the ML side became less
+open-ended and more concrete.
 
-Third, our display plan became more modest. The proposal emphasized a
-React/Plotly-style interface. In the final code, the most polished and reliable
-user-facing path is the command-line simulation, the nested terminal menu, and
-the generated training artifacts. We chose to prioritize a robust tree-based
-simulator and reproducible training path over a more ambitious UI layer.
+Our display plan became more modest. The proposal emphasized a React/Plotly
+interface, but the most polished and reliable user-facing path in the final
+code is the command-line simulation, the nested terminal menu, and the
+generated training artifacts. We chose to prioritize a robust tree-based
+simulator and a reproducible training workflow over a more ambitious UI layer.
+That was a practical choice, not a change in what we thought the project was
+about.
 
-Finally, our data plan became more realistic. Instead of relying only on
-synthetic data or describing external data abstractly, the final project now
-separates three roles clearly: synthetic scenarios for replay, packaged
-internal CSVs for fast reproducible retraining, and a packaged raw LOBSTER pair
-for the real-data preprocessing path. This keeps the TA workflow self-contained
-while still showing that the project can process real market data.
+The data plan also became more realistic. Instead of treating external data in
+the abstract, the final project clearly separates synthetic scenarios for
+replay, packaged internal CSVs for fast retraining, and a packaged raw LOBSTER
+pair for the real-data preprocessing path. That keeps the TA workflow
+self-contained while still showing that the project can process real market
+data.
 
 \section*{6. Discussion}
-Our project goal was to model the mechanics of a limit order book using trees
-and to connect that simulation to a simple market-action classifier. The final
-result does achieve that goal, even though the machine learning results are more
-modest on real data than the simulator itself.
+Our goal was to model the mechanics of a limit order book using trees and to
+connect that simulator to a simple market-action classifier. The final project
+does meet that goal, though the machine learning side is more modest than the
+simulator itself.
 
 On the simulation side, the output is meaningful and easy to interpret. In the
-current default run, the simulator produces active matching instead of a dead
-book. The default \texttt{balanced} run reports 1750.0 total filled volume, 378
-fills, 8 cancellations, a final spread of approximately 0.6, and a final
-midpoint of 100.0. These values show that our event sequence is not merely
-inserting passive orders forever; it is actually generating executions,
-consuming liquidity, and rebuilding the book. That was important because one of
-the main reasons for doing this project was to expose the difference between a
-quoted market price and the mechanics required to fill an order.
+current default \texttt{balanced} run, the simulator reports 1748.0 total
+filled volume, 374 fills, 128 cancellations, a final spread of approximately
+0.6, and a final midpoint of 100.0. Those values show that the event sequence
+is not just inserting passive orders forever; it is generating executions,
+consuming liquidity, and rebuilding the book over time. That mattered to us
+from the beginning, because one of the main motivations for the project was to
+show the difference between a quoted market price and the mechanics required to
+fill an order.
 
 We also think the project succeeds as a data-structures project. The binary
-search trees are not decorative: they are the central representation of the
-market. The need to maintain sorted price levels, extract best bid and best ask,
-remove empty levels, and preserve FIFO priority within a level all fit the
-tree-based design naturally. This gives the project genuine computational
+search trees are not decorative. They are the central representation of the
+market. Maintaining sorted price levels, extracting the best bid and best ask,
+removing empty levels, and preserving FIFO priority within a level all fit the
+tree-based design naturally. That gives the project real computational
 substance beyond simple data loading or basic statistics.
 
-The machine learning component works, but its results should be interpreted
-carefully. The currently packaged baseline checkpoint and its accompanying
-metrics artifact show a validation accuracy of approximately 0.99992 compared to
-a majority-class baseline of approximately 0.33753. These numbers are useful
-for verifying that the training pipeline, checkpoint loader, and saved-state
-workflow all function correctly, but they are not a realistic claim about
+The machine learning component works, but it needs to be interpreted carefully.
+The packaged baseline checkpoint and its accompanying metrics artifact show a
+validation accuracy of approximately 0.99992 compared to a majority-class
+baseline of approximately 0.33753. Those numbers are useful for showing that
+the training pipeline, checkpoint loader, and saved-state workflow function
+correctly, but they should not be read as a realistic claim about
 real-market prediction.
 
-The run-time P\&L shown in the simulator should also be interpreted as an agent
-overlay metric rather than as a proof of profitability. The neural network is
+The run-time P\&L shown in the simulator should also be read as an agent
+overlay metric rather than as proof of profitability. The neural network is
 trained on future midpoint labels, not on a direct trading reward, and the
-simulation overlay uses those labels to build a simple paper position over time.
-As a result, it is possible for the classifier to work as designed while still
+simulation overlay uses those labels to build a simple paper position over
+time. Because of that, the classifier can behave as designed while still
 producing a negative mark-to-market value in a thin or volatile synthetic
 scenario.
 
-On public LOBSTER sample data during development, the task was much harder and
-performance was only modestly above a naive baseline. We therefore do not claim
-that the current model is a high-quality trading strategy or a strong predictive
-system for real markets. Its role in the project is best understood as a
-lightweight proof of concept that connects book-state features to model output
-inside a complete simulator.
+When we tested on public LOBSTER sample data during development, the task was
+much harder and performance was only modestly above a naive baseline. For that
+reason, we do not present the current model as a strong predictive system for
+real markets. In this project, its role is better understood as a small
+proof of concept that connects book-state features to model output inside a
+complete simulator.
 
-This outcome still helps answer our project goal in a useful way. The goal was
-not only to maximize predictive accuracy, but to build a complete computational
+That still answers the project goal in a meaningful way. The goal was never
+just to maximize predictive accuracy. It was to build a full computational
 pipeline from market events to order-book state to derived features to model
-output. In that sense, the ML side of the project is successful: it uses both
-synthetic and real-data paths, produces saved checkpoints, supports inference
-inside the simulator, and can be retrained from the command line or through the
+output. In that sense, the ML side is successful: it uses both synthetic and
+real-data paths, produces saved checkpoints, supports inference inside the
+simulator, and can be retrained from the command line or through the
 interactive menu.
 
-We encountered several limitations. The first was data realism versus
-convenience. Synthetic data is easy to test and reason about, but it is not
-enough to justify a strong predictive claim. Real LOBSTER data is much richer,
-but it creates issues of preprocessing, class balance, and training difficulty.
-A second limitation was model simplicity. We used a small feed-forward network
-over handcrafted features rather than a stronger temporal model. This was a
-reasonable CSC111 project choice, but it limits what the model can learn about
-market dynamics. A third limitation was presentation scope. Our proposal imagined
-a more polished UI layer, but most of our time ended up being invested in the
-simulation engine, dataset handling, and ML pipeline.
+We also ran into clear limitations. Synthetic data is easy to test and reason
+about, but it is not enough to justify a strong predictive claim. Real LOBSTER
+data is much richer, but it brings preprocessing issues, class-balance issues,
+and a harder learning problem. The model itself is also simple: we used a small
+feed-forward network over handcrafted features rather than a stronger temporal
+model. That was a reasonable CSC111 choice, but it limits what the model can
+learn about market dynamics. Finally, our presentation scope narrowed over the
+course of the project. The proposal imagined a more polished UI layer, but most
+of our time went into the simulation engine, dataset handling, and ML pipeline.
 
-If we were to continue this project, the best next steps would be to improve the
+If we were to continue the project, the next steps would be to improve the
 visualization layer, add a stronger sequence-aware model, and evaluate the
-trained agent with more realistic trading metrics over multiple market days.
-Even with those limitations, we believe the current submission succeeds as a
+trained agent with more realistic trading metrics across multiple market days.
+Even with those limitations, we think the current submission succeeds as a
 CSC111 project because it combines tree-based design, non-trivial event
-processing, model training, and interpretable output in one coherent system.
-
-\section*{7. References}
-\begin{enumerate}
-    \item LOBSTER. (n.d.). \textit{Sample data}. Retrieved March 31, 2026, from
-    \url{https://data.lobsterdata.com/info/DataSamples.php}
-    \item PyTorch. (n.d.). \textit{PyTorch}. Retrieved March 31, 2026, from
-    \url{https://pytorch.org/}
-    \item Investopedia. (n.d.). \textit{Limit order book}. Retrieved March 31,
-    2026, from
-    \url{https://www.investopedia.com/terms/l/limitorderbook.asp}
-    \item Investopedia. (n.d.). \textit{Depth of market (DOM)}. Retrieved March
-    31, 2026, from
-    \url{https://www.investopedia.com/terms/d/depth-of-market.asp}
-    \item QuestDB. (n.d.). \textit{Limit order book}. Retrieved March 31, 2026,
-    from \url{https://questdb.com/glossary/limit-order-book/}
-    \item University of Oxford. (2019). \textit{Introduction to limit order book
-    markets}. Retrieved March 31, 2026, from
-    \url{https://www.maths.ox.ac.uk/system/files/attachments/NUS-LOB19.pdf}
-\end{enumerate}
-
-\end{document}

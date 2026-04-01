@@ -1,6 +1,6 @@
 {
-  "mode": "latest",
-  "model_path": "latest_model.pt",
-  "metrics_path": "latest_training_metrics.json",
-  "dataset_label": "AAPL_2012-06-21_34200000_57600000_message_5.csv"
+  "mode": "none",
+  "model_path": null,
+  "metrics_path": null,
+  "dataset_label": "No active model"
 }
