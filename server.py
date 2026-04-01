@@ -1,8 +1,17 @@
 """Quantyze Flask HTTP API for post-simulation book and engine state.
 
-Exposes JSON endpoints for health checks, book summary, depth, matching metrics,
-trade log, and engine execution records. Intended to be constructed after a run
-with the live ``OrderBook`` and ``MatchingEngine`` instances from ``main``.
+Module Description
+==================
+This module exposes JSON endpoints for health checks, book summary, depth,
+matching metrics, trade log, and execution records. It is intended to be
+constructed after a simulation run with the live ``OrderBook`` and
+``MatchingEngine`` instances created in ``main.py``.
+
+Copyright Information
+===============================
+
+Copyright (c) 2026 Cade McNelly, Nicolas Miranda Cantanhede,
+Sahand Samadirand
 """
 
 from __future__ import annotations
@@ -60,7 +69,7 @@ def _api_book_summary_payload(book: OrderBook, agent: Agent | None) -> dict[str,
         "mid_price": book.mid_price(),
     }
     if agent is not None:
-        payload["agent"] = {"total_pnl": agent.total_pnl()}
+        payload["agent"] = {"current_pnl": agent.current_pnl()}
     else:
         payload["agent"] = None
     return payload
@@ -220,3 +229,19 @@ def run_server(app: Flask, port: int, host: str = "127.0.0.1") -> None:
     """Start the Flask development server (blocks until stopped)."""
 
     app.run(host=host, port=port, debug=False, threaded=True)
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': [
+            'json', 'pathlib', 'typing', 'flask', 'matching_engine',
+            'neural_net', 'order_book', 'price_level', 'doctest', 'python_ta'
+        ],
+        'allowed-io': ['_api_trades_payload', 'run_server'],
+        'max-line-length': 120
+    })

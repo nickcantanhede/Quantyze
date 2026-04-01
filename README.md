@@ -1,306 +1,140 @@
 # Quantyze
 
-Quantyze is a CSC111 project that models a limit order book in pure Python.
-The system is structured around two binary search trees of price levels, one
-for bids and one for asks, with FIFO order queues at each price.
+Quantyze is a CSC111 project that simulates a limit order book in pure Python.
+The program uses two binary search trees of price levels, one for bids and one
+for asks, to replay market events under price-time-priority matching. On top of
+the simulator, Quantyze includes a lightweight neural-network classifier that
+can be trained on order-book features and then used as an optional inference
+overlay during simulation.
 
-## Project Status
+## Quickstart
 
-This repository is currently in active development.
+1. Install the libraries in `requirements.txt`.
+2. Extract `quantyze_datasets.zip` beside `main.py`.
+3. Run `main.py`.
 
-Current backend status:
-- the order book, matching engine, and event replay path compile and run
-- the synthetic `balanced`, `low_liquidity`, and `high_volatility` scenarios
-  are deterministic demo markets with active replay behavior
-- the training pipeline can build model-ready datasets and export normalized
-  training CSV artifacts
-- the main training flow writes `latest_model.pt`,
-  `latest_training_metrics.json`, and `latest_training_data.csv` without
-  overwriting the packaged baseline artifacts
-- raw LOBSTER message and orderbook files are supported for dataset building
-
-## Repository Layout
-
-The assignment expects a flat top-level layout. The main source files are:
-
-- `orders.py`: `Event` and `Order` data objects
-- `price_level.py`: one BST node per price with FIFO order storage
-- `book_tree.py`: bid/ask-side BST of `PriceLevel` nodes
-- `order_book.py`: coordinates the bid tree, ask tree, order index, and trade log
-- `matching_engine.py`: routes events and performs price-time-priority matching
-- `data_loader.py`: internal CSV and raw LOBSTER loading, validation, dataset building, and annotation capture
-- `event_stream.py`: replay pipeline for emitting events through the engine
-- `neural_net.py`: optional ML model, trainer, and agent scaffolds
-- `main.py`: entry point for system orchestration
-- `cli_menu.py`: nested interactive terminal menu and artifact inspection helpers
-- `ui.js`: front-end or browser-side visualization entry point
-
-Project references:
-- `Quantyze_Class_Reference.docx`
-- team documentation in the project proposal folder
-
-Generated or runtime artifact names used by the project:
-- `log.json`
-- `active_model.json`
+After extraction, the packaged files that appear beside `main.py` are:
+- `sample_internal.csv`
+- `huge_internal.csv`
+- `instructions.txt`
 - `model.pt`
 - `training_metrics.json`
-- `training_data.csv`
+
+The primary TA-facing workflow is the interactive menu opened by running
+`main.py` with no arguments.
+
+## What the TA Should Run
+
+Recommended grading path:
+- run `main.py`
+- open `Artifacts & Metrics -> View active model status`
+- open `Simulation -> Run default synthetic demo (balanced)`
+- optionally run `low_liquidity` and `high_volatility`
+- optionally open `Training` and run either packaged retraining option
+- if a new model is trained, choose whether to activate it for future
+  simulations
+
+The simulation menu is the main way to experience the project. The training
+menu is a separate workflow that writes `latest_*` artifacts and can then hand
+that checkpoint off to simulation through the active-model setting.
+
+## Workflow Model
+
+There are three different concepts in the final project:
+
+- `balanced`, `low_liquidity`, and `high_volatility` are synthetic simulation
+  sources
+- `sample_internal.csv` is the short retraining demo
+- `huge_internal.csv` is the larger packaged retraining demo
+
+The shipped baseline model is the packaged checkpoint `model.pt`. New training
+runs write:
 - `latest_model.pt`
 - `latest_training_metrics.json`
 - `latest_training_data.csv`
 
-Submission dataset package:
+The currently selected simulation checkpoint is stored in `active_model.json`.
+It can be:
+- `baseline`
+- `latest`
+- `none`
+
+This means simulation source and model source are intentionally separate. For
+example, the program can replay synthetic `balanced` while using either the
+packaged baseline checkpoint, the latest trained checkpoint, or no model.
+
+## Important Output Interpretation
+
+Each simulation run prints two kinds of information:
+
+1. Run configuration
+- simulation source
+- active model mode
+- active model path
+- model provenance label
+
+2. Matching-engine summary
+- `Total Filled`
+- `Fill Count`
+- `Cancel Count`
+- `Average Slippage`
+- `Spread`
+- `Mid Price`
+- `Current Mark-to-Market P&L` if a model is active
+
+The matching-engine metrics describe the event replay itself. The P&L line is a
+simple agent overlay metric, not a claim that the model is a profitable trading
+strategy.
+
+## Top-Level Files
+
+The final submission tree is intentionally flat. The key files are:
+- `main.py`: entry point and top-level orchestration
+- `cli_menu.py`: interactive terminal menu
+- `data_loader.py`: internal CSV, synthetic scenario, and raw LOBSTER loading
+- `matching_engine.py`: price-time-priority matching logic
+- `order_book.py`, `book_tree.py`, `price_level.py`: tree-based order book
+- `neural_net.py`: model, training loop, and agent
+- `server.py`: optional Flask API helper
+- `ui.js`: optional browser-side API helper for future UI work
+- `project_report.tex`
+- `project_report.pdf`
 - `quantyze_datasets.zip`
-- package contents: `sample_internal.csv`, `huge_internal.csv`,
-  `instructions.txt`, `model.pt`, and `training_metrics.json`
-- extract this zip beside `main.py` before using the packaged training options
+- `requirements.txt`
+- `active_model.json`
 
-## Architecture Summary
+## Useful Commands
 
-The intended runtime flow is:
+Install dependencies:
 
-1. `DataLoader` loads or generates `Event` objects.
-2. `EventStream` emits each event into the `MatchingEngine`.
-3. `MatchingEngine` routes each event to limit, market, or cancel handling.
-4. `OrderBook` coordinates the bid/ask `BookTree` instances.
-5. Each `BookTree` stores `PriceLevel` nodes keyed by price.
-6. Each `PriceLevel` maintains FIFO time priority for resting orders.
-7. Executions are written to in-memory logs and later flushed for analysis.
+```bash
+python3 -m pip install -r requirements.txt
+```
 
-## LOBSTER Notes
-
-When raw LOBSTER files are used:
-
-- message types `1` to `5` are treated as replay-compatible under the current
-  engine assumptions
-- message type `6` (cross trade) is recognized, preserved as a visualization
-  annotation, and kept in the supervised dataset path
-- message type `7` (halt / quote resume / trade resume) is recognized and
-  preserved as a visualization annotation, but excluded from replay and
-  training examples
-
-This keeps the simulator core limited to clean limit / market / cancel replay
-while still exposing richer real-market metadata for plots, notebooks, or a
-future UI layer.
-
-## ML and Dataset Notes
-
-The current training/data path uses one shared 16-feature schema for both
-training and inference. It includes the current level-1 / level-2 snapshot
-plus a short one-step history signal:
-
-1. best bid price
-2. best bid size
-3. best ask price
-4. best ask size
-5. spread
-6. mid-price
-7. level-1 imbalance
-8. level-2 bid price
-9. level-2 bid size
-10. level-2 ask price
-11. level-2 ask size
-12. event-side feature
-13. one-step best bid price delta
-14. one-step best ask price delta
-15. one-step mid-price delta
-16. one-step imbalance delta
-
-Labels use a fixed 50-event horizon with a +/- $0.01 move threshold:
-- `0 = buy`
-- `1 = sell`
-- `2 = hold`
-
-More concretely:
-- if the mid-price 50 events later is more than `0.01` above the current mid,
-  the label is `buy`
-- if it is more than `0.01` below the current mid, the label is `sell`
-- otherwise the label is `hold`
-
-The main training pipeline standardizes features using the training split mean
-and standard deviation before fitting the model. The exported
-`training_data.csv` artifact contains those normalized 16-D feature rows
-together with their labels.
-
-Training uses class-weighted cross-entropy so rare classes, especially `hold`,
-contribute more strongly to the loss.
-
-Checkpoint behavior:
-- a valid non-empty checkpoint means the ML agent can be activated
-- a missing, empty, or invalid checkpoint should be treated as "simulation
-  only"
-- the public loader contract returns `None` when no valid checkpoint is
-  available, so simulation can run safely without ML
-
-After training, Quantyze also writes `training_metrics.json`, which stores the
-loss curves, validation accuracy, majority-class baseline, per-class recall,
-prediction counts, and confusion matrix.
-
-The shipped saved-state artifacts are:
-- `model.pt`
-- `training_metrics.json`
-- `training_data.csv`
-
-These baseline artifacts are intended to come from `huge_internal.csv`. New
-training runs from the menu or the direct CLI should write to:
-- `latest_model.pt`
-- `latest_training_metrics.json`
-- `latest_training_data.csv`
-
-This keeps the packaged saved checkpoint stable for grading while still
-letting the TA run a short training example and inspect the new results.
-
-There are three distinct dataset roles in the project:
-- synthetic `balanced`: the default simulation demo source
-- `sample_internal.csv`: the quick retraining demo source
-- `huge_internal.csv`: the source of the shipped baseline checkpoint
-
-Training and simulation are separate runtime modes, but they are connected by
-`active_model.json`. This state file persists whether future simulations should
-use the baseline checkpoint, the latest trained checkpoint, or no model at all.
-
-## TA Menu
-
-Running `main.py` with no arguments now opens the TA-facing interactive menu.
-This is the primary grading path.
+Run the interactive menu:
 
 ```bash
 python3 main.py
 ```
 
-```powershell
-py -3 main.py
-```
-
-Main menu:
-- `Simulation`
-- `Training`
-- `Artifacts & Metrics`
-- `Help / Command Reference`
-- `Exit`
-
-Simulation submenu:
-- run the default synthetic demo (`balanced`)
-- run a chosen synthetic scenario with a chosen replay speed
-- replay from a custom internal CSV or raw LOBSTER message CSV path
-- choose the active simulation model (`baseline`, `latest`, or `none`)
-- view the current simulation configuration
-
-Training submenu:
-- quick retraining demo on packaged `sample_internal.csv`
-- retrain a baseline-scale model on packaged `huge_internal.csv`
-- train on a custom dataset path
-- view the baseline-vs-latest training output targets
-- optionally activate the newly trained `latest_model.pt` for future simulations
-
-Artifacts & Metrics submenu:
-- view active model status
-- view baseline metrics
-- view latest metrics
-- view both baseline and latest metrics
-- inspect artifact status
-- inspect the current `log.json`
-- inspect the contents of `quantyze_datasets.zip`
-
-The submitted dataset zip should be extracted beside `main.py` before using the
-packaged training options. Simulation source and model source are now reported
-separately so it is always clear whether the program is replaying synthetic
-data, packaged data, or a custom dataset, and whether it is using the baseline
-checkpoint, the latest checkpoint, or no model.
-
-The interactive menu intentionally does not include the Flask / UI stub because
-that path is not yet a complete runtime flow.
-
-## Useful Commands
-
-Before using packaged sample or huge datasets, extract `quantyze_datasets.zip`
-beside `main.py`.
-
-Syntax check:
-
-```bash
-python3 -m py_compile *.py
-```
-
-Run the default synthetic simulation directly:
+Run the default simulation directly:
 
 ```bash
 python3 main.py --no-ui
 ```
 
-```powershell
-py -3 main.py --no-ui
-```
-
-This writes `log.json` in addition to printing the terminal summary.
-The active checkpoint is resolved through `active_model.json`.
-
-Train on an internal CSV:
+Train on an extracted packaged dataset directly:
 
 ```bash
 python3 main.py --train --data sample_internal.csv
 ```
 
-```powershell
-py -3 main.py --train --data sample_internal.csv
-```
-
-This writes:
-- `latest_model.pt`
-- `latest_training_metrics.json`
-- `latest_training_data.csv`
-
-It does not overwrite the shipped `model.pt` or `training_metrics.json`.
-From the interactive menu, you can optionally mark this newly trained model as
-the active checkpoint for later simulations.
-
-Train on the packaged huge internal CSV after extraction:
-
 ```bash
 python3 main.py --train --data huge_internal.csv
 ```
 
-```powershell
-py -3 main.py --train --data huge_internal.csv
-```
-
-Train on a raw LOBSTER message file:
+Train on a custom internal CSV or raw LOBSTER message CSV:
 
 ```bash
-python3 main.py --train --data <lobster_message_csv>
+python3 main.py --train --data <csv_path>
 ```
-
-```powershell
-py -3 main.py --train --data <lobster_message_csv>
-```
-
-Export training data manually from Python:
-
-```python
-from data_loader import DataLoader
-
-loader = DataLoader()
-loader.generate_synthetic("balanced", 100)
-loader.export_training_csv("training_data.csv")
-```
-
-For raw LOBSTER training, the paired orderbook file is inferred from the
-message filename by replacing `_message_` with `_orderbook_`.
-
-
-## Current Validation
-
-The current lightweight validation flow is:
-
-```bash
-python3 -m py_compile *.py
-python3 main.py
-```
-
-This confirms:
-- Python modules compile cleanly
-- the default run opens the nested interactive TA menu
-- the default or scenario simulation still runs end-to-end
-- the simulation run writes `log.json` with the execution records from the simulation
-- the shipped `model.pt` checkpoint can be loaded during simulation if it is valid
-- a short training run writes separate `latest_*` artifacts without replacing the shipped checkpoint

@@ -4,8 +4,8 @@ Module Description
 ==================
 PyTorch model (OrderBookNet), training loop (Trainer), and inference wrapper
 (Agent) that map order-book features to discrete actions (buy / sell / hold).
-Trained on event or feature data derived from training_data.csv; checkpoints
-are saved as model.pt for Agent.load-style workflows.
+Trained on event or feature data derived from Quantyze datasets; checkpoints
+can then be saved and loaded for later simulation-time inference.
 
 build_features and Agent.observe extract a fixed-size vector from OrderBook
 snapshots (spread, depth, mid, imbalance, etc.) for forward passes.
@@ -164,7 +164,7 @@ class Trainer:
         val_loader: DataLoader,
         epochs: int = 50,
     ) -> None:
-        """Train for ``epochs``; track history and persist the best weights to model.pt."""
+        """Train for ``epochs`` and keep the best validation-loss state in memory."""
 
         best_val = float("inf")
         best_state: dict[str, Tensor] | None = None

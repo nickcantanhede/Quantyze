@@ -14,7 +14,7 @@
 
 \newcommand{\projectname}{Quantyze}
 \newcommand{\projecttitle}{Trees, Trades, and Books}
-\newcommand{\projectsubtitle}{Simulating a Limit Order Book with Tree-Based Data Structures and a Lightweight ML Agent}
+\newcommand{\projectsubtitle}{Simulating a Limit Order Book with Tree-Based Data Structures and an ML Agent}
 \newcommand{\projectdate}{March 31, 2026}
 
 \begin{document}
@@ -133,8 +133,9 @@ contains:
 \end{itemize}
 
 The small sample dataset is meant for a short under-one-minute training check.
-The larger internal dataset is the source of the packaged baseline checkpoint
-used by the saved-state workflow.
+The larger internal dataset is a baseline-scale retraining demo. The packaged
+saved-state workflow also includes a shipped baseline checkpoint and metrics so
+that the TA can use the model path without retraining first.
 
 \section*{3. Computational Overview}
 \subsection*{3.1 Core Data Representation}
@@ -187,8 +188,8 @@ At the end of a normal run, \texttt{main.py} prints a terminal summary with:
 \end{itemize}
 
 The current default run path is command-line based rather than browser based.
-This means the project reports results through terminal output and generated
-artifacts, including:
+This means the project reports results through terminal output, the packaged
+saved-state artifacts extracted from the dataset zip, and runtime logs such as:
 \begin{itemize}
     \item \texttt{model.pt}
     \item \texttt{training\_metrics.json}
@@ -322,40 +323,45 @@ Figure 1 shows the intended workflow.
 \begin{figure}[h]
 \centering
 \begin{tikzpicture}[
-    node distance=0.9cm and 1.0cm,
+    scale=0.95,
+    transform shape,
+    node distance=1.0cm and 1.8cm,
+    every node/.style={font=\small},
     box/.style={
         rectangle,
         rounded corners,
         draw=black,
         align=center,
-        minimum width=3.1cm,
+        text width=4.0cm,
         minimum height=0.95cm
     },
     decision/.style={
         diamond,
         draw=black,
         align=center,
-        aspect=2.2,
-        inner sep=0.2em
+        aspect=2.1,
+        text width=2.8cm,
+        inner xsep=0.5em,
+        inner ysep=0.55em
     },
     arrow/.style={-{Latex[length=2mm]}, thick}
 ]
-\node[box] (menu) {Open \texttt{main.py}\\interactive menu};
-\node[box, below=of menu] (status) {Inspect active model\\status if desired};
-\node[decision, below=of status] (trainq) {Train a new\\model?};
-\node[box, below left=1.2cm and 2.1cm of trainq] (train) {Training menu\\\texttt{sample\_internal.csv}\\or \texttt{huge\_internal.csv}};
-\node[decision, below=of train] (activate) {Activate\\\texttt{latest} model?};
-\node[box, below right=1.2cm and 2.1cm of trainq] (sim) {Simulation menu\\choose scenario\\or replay path};
-\node[box, below=of activate] (active) {Active model stored in\\\texttt{active\_model.json}};
-\node[box, below=of sim] (output) {Read run header,\\matching metrics,\\and agent overlay P\&L};
+\node[box, text width=3.3cm] (menu) {Open \texttt{main.py}\\interactive menu};
+\node[box, below=of menu, text width=4.2cm] (status) {Inspect active model\\status if desired};
+\node[decision, below=1.1cm of status] (trainq) {Train a new\\model?};
+\node[box, below left=1.3cm and 2.8cm of trainq] (train) {Training menu\\\texttt{sample\_internal.csv}\\or \texttt{huge\_internal.csv}};
+\node[decision, below=1.2cm of train, text width=2.4cm] (activate) {Activate\\\texttt{latest} model?};
+\node[box, below=1.15cm of activate] (active) {Persist active model\\selection in\\\texttt{active\_model.json}};
+\node[box, below right=1.3cm and 2.8cm of trainq] (sim) {Simulation menu\\choose scenario\\or replay path};
+\node[box, below=1.15cm of sim, text width=4.3cm] (output) {Read run header, matching metrics,\\and agent overlay P\&L};
 
 \draw[arrow] (menu) -- (status);
 \draw[arrow] (status) -- (trainq);
-\draw[arrow] (trainq) -- node[left] {yes} (train);
-\draw[arrow] (trainq) -- node[right] {no} (sim);
+\draw[arrow] (trainq) -- node[above left] {yes} (train);
+\draw[arrow] (trainq) -- node[above right] {no} (sim);
 \draw[arrow] (train) -- (activate);
-\draw[arrow] (activate.east) -| node[pos=0.25, right] {yes or no} (active.east);
-\draw[arrow] (active.east) -| (sim.west);
+\draw[arrow] (activate) -- (active);
+\draw[arrow] (active.east) -| ([yshift=-0.45cm]sim.west);
 \draw[arrow] (sim) -- (output);
 \end{tikzpicture}
 \caption{Recommended TA workflow: train if desired, optionally activate the new
@@ -409,8 +415,8 @@ Before each run, the program prints:
     \item the \textbf{active model mode}, such as \texttt{baseline},
     \texttt{latest}, or \texttt{none}
     \item the \textbf{active model path}
-    \item the \textbf{model provenance}, such as \texttt{huge\_internal.csv}
-    or \texttt{sample\_internal.csv}
+    \item the \textbf{model provenance}, such as the packaged baseline
+    checkpoint or a newly trained dataset like \texttt{sample\_internal.csv}
 \end{itemize}
 
 This header tells the TA which market is being replayed and which checkpoint is
@@ -523,12 +529,12 @@ tree-based design naturally. This gives the project genuine computational
 substance beyond simple data loading or basic statistics.
 
 The machine learning component works, but its results should be interpreted
-carefully. The currently packaged baseline checkpoint was trained on
-\texttt{huge\_internal.csv}, and its saved metrics show a validation accuracy of
-approximately 0.99992 compared to a majority-class baseline of approximately
-0.33753. These numbers are useful for verifying that the training pipeline,
-checkpoint loader, and saved-state workflow all function correctly, but they are
-not a realistic claim about real-market prediction.
+carefully. The currently packaged baseline checkpoint and its accompanying
+metrics artifact show a validation accuracy of approximately 0.99992 compared to
+a majority-class baseline of approximately 0.33753. These numbers are useful
+for verifying that the training pipeline, checkpoint loader, and saved-state
+workflow all function correctly, but they are not a realistic claim about
+real-market prediction.
 
 The run-time P\&L shown in the simulator should also be interpreted as an agent
 overlay metric rather than as a proof of profitability. The neural network is

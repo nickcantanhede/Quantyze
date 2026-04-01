@@ -30,7 +30,6 @@ class MenuConfig:
 
     model_path: str
     training_metrics_path: str
-    training_data_path: str
     latest_model_path: str
     latest_training_metrics_path: str
     latest_training_data_path: str
@@ -300,7 +299,6 @@ def _print_training_output_targets(config: MenuConfig) -> None:
     print("=" * 30)
     print(f"Checkpoint: {os.path.abspath(config.model_path)}")
     print(f"Metrics: {os.path.abspath(config.training_metrics_path)}")
-    print(f"Training Data: {os.path.abspath(config.training_data_path)}")
     print("=" * 30)
     print("Latest training outputs")
     print("=" * 30)
@@ -333,7 +331,6 @@ def _print_artifact_status(config: MenuConfig) -> None:
     artifact_names = [
         config.model_path,
         config.training_metrics_path,
-        config.training_data_path,
         config.latest_model_path,
         config.latest_training_metrics_path,
         config.latest_training_data_path,
@@ -408,7 +405,8 @@ def _print_help_reference(config: MenuConfig) -> None:
     print("Workflow roles:")
     print("  - synthetic balanced = default simulation demo")
     print(f"  - {config.sample_dataset_path} = quick training demo")
-    print(f"  - {config.huge_dataset_path} = source of the shipped baseline checkpoint")
+    print(f"  - {config.huge_dataset_path} = larger packaged retraining demo")
+    print("  - baseline model = packaged saved checkpoint from the dataset zip")
     print("Training and simulation are separate modes connected by the active model.")
     print(
         f"The active model persists across runs through {config.active_model_state_path} "
@@ -463,6 +461,7 @@ def _choose_active_model_menu(config: MenuConfig) -> None:
             print("Baseline model selected.")
             if status.get("note"):
                 print(f"Note: {status['note']}")
+            return
         elif choice == "2":
             if not latest_available:
                 print(f"Latest trained checkpoint not found at {config.latest_model_path}.")
@@ -471,9 +470,11 @@ def _choose_active_model_menu(config: MenuConfig) -> None:
             print("Latest trained model selected.")
             if status.get("note"):
                 print(f"Note: {status['note']}")
+            return
         elif choice == "3":
             config.set_active_model("none")
             print("Future simulations will run without a model.")
+            return
         else:
             print("Invalid option. Please enter a number from 1 to 4.")
 
@@ -634,3 +635,28 @@ def interactive_menu(config: MenuConfig) -> None:
             _help_menu(config)
         else:
             print("Invalid option. Please enter a number from 1 to 5.")
+
+
+if __name__ == '__main__':
+    import doctest
+    import python_ta
+
+    doctest.testmod()
+
+    python_ta.check_all(config={
+        'extra-imports': [
+            'argparse', 'json', 'os', 'zipfile', 'collections.abc', 'dataclasses',
+            'doctest', 'python_ta'
+        ],
+        'allowed-io': [
+            '_print_metrics_file', 'print_saved_training_metrics', 'print_baseline_training_metrics',
+            'print_latest_training_metrics', '_prompt_text', '_prompt_scenario', '_prompt_yes_no',
+            '_prompt_replay_speed', '_prompt_dataset_path', '_print_packaged_dataset_hint',
+            '_print_active_model_status', '_run_simulation_menu', '_run_training_menu',
+            '_print_training_output_targets', '_print_simulation_configuration',
+            '_print_artifact_status', '_print_log_summary', '_print_dataset_package_contents',
+            '_print_help_reference', '_choose_active_model_menu', '_simulation_menu',
+            '_training_menu', '_artifacts_menu', '_help_menu', 'interactive_menu'
+        ],
+        'max-line-length': 120
+    })

@@ -46,7 +46,6 @@ from order_book import OrderBook
 CLASS_NAMES = ["buy", "sell", "hold"]
 MODEL_PATH = "model.pt"
 TRAINING_METRICS_PATH = "training_metrics.json"
-TRAINING_DATA_PATH = "training_data.csv"
 LATEST_MODEL_PATH = "latest_model.pt"
 LATEST_TRAINING_METRICS_PATH = "latest_training_metrics.json"
 LATEST_TRAINING_DATA_PATH = "latest_training_data.csv"
@@ -56,6 +55,7 @@ SAMPLE_DATASET_PATH = "sample_internal.csv"
 HUGE_DATASET_PATH = "huge_internal.csv"
 SCENARIO_CHOICES = ("balanced", "low_liquidity", "high_volatility")
 ACTIVE_MODEL_MODES = ("baseline", "latest", "none")
+BASELINE_MODEL_LABEL = "packaged baseline checkpoint"
 
 
 def parse_args() -> argparse.Namespace:
@@ -153,7 +153,7 @@ def _active_model_payload(mode: str, dataset_label: str | None = None) -> dict[s
             "mode": "baseline",
             "model_path": MODEL_PATH,
             "metrics_path": TRAINING_METRICS_PATH,
-            "dataset_label": dataset_label or HUGE_DATASET_PATH,
+            "dataset_label": dataset_label or BASELINE_MODEL_LABEL,
         }
     if mode == "latest":
         latest_label = dataset_label or _dataset_label_from_metrics(
@@ -552,7 +552,6 @@ def _build_menu_config() -> MenuConfig:
     return MenuConfig(
         model_path=MODEL_PATH,
         training_metrics_path=TRAINING_METRICS_PATH,
-        training_data_path=TRAINING_DATA_PATH,
         latest_model_path=LATEST_MODEL_PATH,
         latest_training_metrics_path=LATEST_TRAINING_METRICS_PATH,
         latest_training_data_path=LATEST_TRAINING_DATA_PATH,

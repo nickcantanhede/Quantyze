@@ -19,3 +19,21 @@ htmlcov/
 # IDE files
 .idea/
 .vscode/
+
+# Extracted dataset package contents and runtime artifacts
+sample_internal.csv
+huge_internal.csv
+instructions.txt
+model.pt
+training_metrics.json
+latest_model.pt
+latest_training_metrics.json
+latest_training_data.csv
+training_data.csv
+log.json
+
+# LaTeX intermediates
+*.aux
+*.log
+*.xdv
+*.synctex.gz
