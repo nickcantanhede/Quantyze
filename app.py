@@ -3,7 +3,7 @@
 The browser frontend is now implemented in ``main.py`` so the supported entry
 point is:
 
-    python main.py --web
+    python main.py --ui
 
 This module remains as a thin shim for backwards compatibility.
 """
@@ -25,7 +25,7 @@ def main() -> None:
     args = parser.parse_args()
 
     app = create_app()
-    print(f"Quantize web UI → http://{args.host}:{args.port}")
+    print(f"Quantyze web UI -> http://{args.host}:{args.port}")
     print("Press Ctrl+C to stop.")
     app.run(host=args.host, port=args.port, debug=False, threaded=True)
 

@@ -1,5 +1,5 @@
 /**
- * Quantize Web UI — frontend logic
+ * Quantyze Web UI — frontend logic
  *
  * Talks exclusively to the Flask backend served from main.py.
  * No business logic here — all decisions stay in the Python backend.
@@ -51,6 +51,11 @@ function fmtKB(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function overlayModeText(mode) {
+  const labels = { baseline: 'Baseline', latest: 'Latest', none: 'None' };
+  return labels[mode] || String(mode || '—');
 }
 
 /* ─── tab switching ──────────────────────────────────────────────────────── */
@@ -154,8 +159,6 @@ async function runSimulation() {
   setStatus('running');
 
   $('sim-run-btn').disabled = true;
-  show('sim-cancel-btn');
-  hide('sim-cancel-btn');   // hide cancel — we don't interrupt fast simulations
   $('sim-run-btn').textContent = '⏳ Running…';
 
   const res = await apiPost('/api/simulate', body);
@@ -230,7 +233,7 @@ function renderSimResults(r) {
     <div class="section-label">Agent Overlay</div>
     <div class="results-grid" style="grid-template-columns: repeat(2, 1fr)">
       ${metricCard('Agent P&L', fmt2(r.agent_pnl), pnlClass(r.agent_pnl))}
-      ${metricCard('Overlay Mode', r.overlay_mode || '—')}
+      ${metricCard('Overlay Mode', overlayModeText(r.overlay_mode))}
     </div>` : '';
 
   panel.innerHTML = `
@@ -261,16 +264,6 @@ function metricCard(label, value, cls = '') {
 function pnlClass(v) {
   if (v == null) return '';
   return v > 0 ? 'positive' : v < 0 ? 'negative' : '';
-}
-
-async function cancelSimulation() {
-  await apiDelete('/api/simulate');
-  clearInterval(simPollId);
-  simPollId = null;
-  $('sim-run-btn').disabled = false;
-  $('sim-run-btn').textContent = '▶ Run Simulation';
-  hide('sim-cancel-btn');
-  setStatus('idle');
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -439,7 +432,7 @@ function renderArtifacts(art, baseline, latest, logSum) {
       <div class="card-hd">Active Model Overlay</div>
       <div class="overlay-info-row">
         <span class="key">Current mode</span>
-        <span class="val"><span class="pill ${modeColor[am.mode] || 'pill-mode'}">${escHtml(am.mode || '—')}</span></span>
+        <span class="val"><span class="pill ${modeColor[am.mode] || 'pill-mode'}">${escHtml(overlayModeText(am.mode))}</span></span>
       </div>
       <div class="overlay-info-row">
         <span class="key">Dataset label</span>

@@ -179,22 +179,55 @@ def parse_args() -> argparse.Namespace:
         "--port",
         type=int,
         default=9000,
-        help="Port used for the Flask or UI server"
+        help="Port used for the browser UI or post-simulation API server"
     )
 
-    parser.add_argument(
+    runtime_group = parser.add_mutually_exclusive_group()
+    runtime_group.add_argument(
+        "--ui",
+        "--web",
+        dest="ui",
+        action="store_true",
+        help="Start the browser-based web UI at http://127.0.0.1:<port>"
+    )
+    runtime_group.add_argument(
+        "--cli",
+        action="store_true",
+        help="Open the interactive terminal menu"
+    )
+    runtime_group.add_argument(
         "--no-ui",
         action="store_true",
-        help="Skip the Flask or UI server"
+        help="Run directly without starting the browser UI"
     )
 
-    parser.add_argument(
-        "--web",
-        action="store_true",
-        help="Start the browser-based web UI at http://localhost:<port>"
+    args = parser.parse_args()
+    direct_requested = (
+        args.train
+        or args.data is not None
+        or args.scenario is not None
+        or args.speed != 0.0
     )
 
-    return parser.parse_args()
+    if args.train and not args.no_ui:
+        parser.error("Training mode requires --no-ui.")
+
+    if args.train and args.data is None:
+        parser.error("Training mode requires --data <csv_path>.")
+
+    if args.train and args.scenario is not None:
+        parser.error("--scenario cannot be combined with --train.")
+
+    if args.cli and direct_requested:
+        parser.error("Direct simulation/training arguments cannot be combined with --cli.")
+
+    if args.ui and direct_requested:
+        parser.error("Direct simulation/training arguments require --no-ui, not --ui.")
+
+    if not args.ui and not args.cli and not args.no_ui and direct_requested:
+        parser.error("Direct simulation/training arguments require --no-ui.")
+
+    return args
 
 
 def _checkpoint_exists(path: str | None) -> bool:
@@ -1182,9 +1215,14 @@ def create_web_app() -> Flask:
     def index() -> Any:
         return send_from_directory(".", "index.html")
 
+    @app.get("/frontend/<path:asset>")
+    def frontend_asset(asset: str) -> Any:
+        """Serve legacy frontend asset URLs used by older cached HTML."""
+        return send_from_directory(".", asset)
+
     @app.get("/api/health")
     def health() -> Any:
-        return jsonify({"status": "ok", "service": "quantize-web"})
+        return jsonify({"status": "ok", "service": "quantyze-web"})
 
     @app.get("/api/model-status")
     def get_model_status() -> Any:
@@ -1504,15 +1542,15 @@ def main() -> None:
     prints final summary information.
     """
 
-    if len(sys.argv) == 1:
+    args = parse_args()
+
+    if args.cli:
         run_interactive_menu(_build_menu_config())
         return
 
-    args = parse_args()
-
-    if args.web:
+    if args.ui or not args.no_ui:
         web_app = create_web_app()
-        print(f"Quantize web UI → http://127.0.0.1:{args.port}")
+        print(f"Quantyze web UI -> http://127.0.0.1:{args.port}")
         print("Press Ctrl+C to stop.")
         web_app.run(host="127.0.0.1", port=args.port, debug=False, threaded=True)
         return
