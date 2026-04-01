@@ -40,6 +40,96 @@ class ParsedLobsterRow(TypedDict):
     resting_side: str | None
 
 
+SYNTHETIC_START_TIME = datetime(2026, 1, 1, 9, 30, 0)
+
+
+class _SyntheticScenarioBuilder:
+    """Build deterministic synthetic event streams while tracking book state."""
+
+    events: list[Event]
+    book: OrderBook
+    engine: MatchingEngine
+    _time_step_seconds: int
+    _tracked_order_ids: dict[str, list[str]]
+
+    def __init__(self, time_step_seconds: int = 1) -> None:
+        """Initialize a fresh synthetic replay context."""
+        self.events = []
+        self.book = OrderBook()
+        self.engine = MatchingEngine(self.book)
+        self._time_step_seconds = time_step_seconds
+        self._tracked_order_ids = {"buy": [], "sell": []}
+
+    def _next_timestamp(self) -> datetime:
+        """Return the deterministic timestamp for the next synthetic event."""
+        return SYNTHETIC_START_TIME + timedelta(
+            seconds=len(self.events) * self._time_step_seconds
+        )
+
+    def next_order_id(self, prefix: str) -> str:
+        """Return a unique synthetic order id using the current event index."""
+        return f"{prefix}_{len(self.events)}"
+
+    def add_event(
+        self,
+        order_id: str,
+        side: str,
+        order_type: str,
+        price: float | None,
+        quantity: float
+    ) -> Event:
+        """Append one event and replay it through the temporary engine."""
+        event = Event(self._next_timestamp(), order_id, side, order_type, price, quantity)
+        self.events.append(event)
+        self.engine.process_event(event)
+
+        if order_type == "limit" and order_id in self.book.order_index:
+            self._tracked_order_ids[side].append(order_id)
+
+        return event
+
+    def add_limit(self, prefix: str, side: str, price: float, quantity: float) -> str:
+        """Append one resting or crossing limit order and return its id."""
+        order_id = self.next_order_id(prefix)
+        self.add_event(order_id, side, "limit", price, quantity)
+        return order_id
+
+    def add_market(self, prefix: str, side: str, quantity: float) -> str:
+        """Append one market order and return its id."""
+        order_id = self.next_order_id(prefix)
+        self.add_event(order_id, side, "market", None, quantity)
+        return order_id
+
+    def cancel_oldest(self, side: str) -> bool:
+        """Cancel the oldest still-live resting order on ``side`` if one exists."""
+        queue = self._tracked_order_ids[side]
+        while queue and queue[0] not in self.book.order_index:
+            queue.pop(0)
+
+        if not queue:
+            return False
+
+        order_id = queue.pop(0)
+        self.add_event(order_id, side, "cancel", None, 0.0)
+        return True
+
+    def best_bid_price(self) -> float | None:
+        """Return the current best bid price in the temporary book."""
+        best_bid = self.book.best_bid()
+        return None if best_bid is None else best_bid.price
+
+    def best_ask_price(self) -> float | None:
+        """Return the current best ask price in the temporary book."""
+        best_ask = self.book.best_ask()
+        return None if best_ask is None else best_ask.price
+
+    def can_submit_market(self, side: str) -> bool:
+        """Return whether the opposite side currently has liquidity."""
+        if side == "buy":
+            return self.best_ask_price() is not None
+        return self.best_bid_price() is not None
+
+
 class DataLoader:
     """Load, validate, and generate collections of Event objects.
 
@@ -419,17 +509,9 @@ class DataLoader:
         Preconditions:
         - n >= 0
         """
-
-        base_time = datetime.now()
-        events = []
+        builder = _SyntheticScenarioBuilder()
         tracked_buy_ids = []
         tracked_sell_ids = []
-
-        def _add_event(odr_id: str, side: str, order_type: str, price: float | None, qty: float) -> None:
-            """Append one event using the next sequential synthetic timestamp."""
-            timestamp = base_time + timedelta(seconds=len(events))
-            event = Event(timestamp, odr_id, side, order_type, price, qty)
-            events.append(event)
 
         # Seed the book with a small ladder of resting bids and asks near 100.
         seed_orders = [
@@ -442,8 +524,8 @@ class DataLoader:
         ]
 
         i = 0
-        while len(events) < n and i < len(seed_orders):
-            _add_event(
+        while len(builder.events) < n and i < len(seed_orders):
+            builder.add_event(
                 seed_orders[i][0],
                 seed_orders[i][1],
                 seed_orders[i][2],
@@ -453,48 +535,48 @@ class DataLoader:
             i += 1
 
         cycle_so_far = 0
-        while len(events) < n:
+        while len(builder.events) < n:
             step = cycle_so_far % 8
-            index = len(events)
+            index = len(builder.events)
 
             if step == 0:
                 order_id = f"rest_bid_{index}"
                 tracked_buy_ids.append(order_id)
-                _add_event(order_id, "buy", "limit", 99.7, 4.0)
+                builder.add_event(order_id, "buy", "limit", 99.7, 4.0)
             elif step == 1:
                 order_id = f"rest_ask_{index}"
                 tracked_sell_ids.append(order_id)
-                _add_event(order_id, "sell", "limit", 100.3, 4.0)
+                builder.add_event(order_id, "sell", "limit", 100.3, 4.0)
             elif step == 2:
-                _add_event(f"cross_buy_{index}", "buy", "limit", 100.2, 6.0)
+                builder.add_event(f"cross_buy_{index}", "buy", "limit", 100.2, 6.0)
 
             elif step == 3:
-                _add_event(f"cross_sell_{index}", "sell", "limit", 99.8, 6.0)
+                builder.add_event(f"cross_sell_{index}", "sell", "limit", 99.8, 6.0)
 
             elif step == 4:
-                _add_event(f"market_buy_{index}", "buy", "market", None, 4.0)
+                builder.add_event(f"market_buy_{index}", "buy", "market", None, 4.0)
 
             elif step == 5:
-                _add_event(f"market_sell_{index}", "sell", "market", None, 4.0)
+                builder.add_event(f"market_sell_{index}", "sell", "market", None, 4.0)
 
             elif step == 6 and tracked_buy_ids:
-                _add_event(tracked_buy_ids.pop(0), "buy", "cancel", None, 0.0)
+                builder.add_event(tracked_buy_ids.pop(0), "buy", "cancel", None, 0.0)
 
             elif step == 7 and tracked_sell_ids:
-                _add_event(tracked_sell_ids.pop(0), "sell", "cancel", None, 0.0)
+                builder.add_event(tracked_sell_ids.pop(0), "sell", "cancel", None, 0.0)
             else:
                 if step == 6:
                     order_id = f"fallback_bid_{index}"
                     tracked_buy_ids.append(order_id)
-                    _add_event(order_id, "buy", "limit", 99.7, 4.0)
+                    builder.add_event(order_id, "buy", "limit", 99.7, 4.0)
                 else:
                     order_id = f"fallback_ask_{index}"
                     tracked_sell_ids.append(order_id)
-                    _add_event(order_id, "sell", "limit", 100.3, 4.0)
+                    builder.add_event(order_id, "sell", "limit", 100.3, 4.0)
 
             cycle_so_far += 1
 
-        return events
+        return builder.events
 
     @staticmethod
     def _low_liquidity(n: int) -> list[Event]:
@@ -503,17 +585,59 @@ class DataLoader:
         Preconditions:
         - n >= 0
         """
-        base_time = datetime.now()
-        synthetic_events = []
+        builder = _SyntheticScenarioBuilder(time_step_seconds=10)
+        cycle_so_far = 0
+        best_bid_price = 98.8
+        best_ask_price = 101.2
+        deep_bid_price = 98.2
+        deep_ask_price = 101.8
 
-        for i in range(n):
-            timestamp = base_time + timedelta(seconds=i * 10)
-            side = 'buy' if i % 10 == 0 else 'sell'
-            price = 98.0 if side == 'buy' else 102.0
-            event = Event(timestamp, f"order_{i}", side, 'limit', price, 5.0)
-            synthetic_events.append(event)
+        while len(builder.events) < n:
+            step = cycle_so_far % 10
+            cycle_index = cycle_so_far // 10
 
-        return synthetic_events
+            if step == 0:
+                builder.add_limit("thin_bid", "buy", best_bid_price, 2.0)
+            elif step == 1:
+                builder.add_limit("thin_ask", "sell", best_ask_price, 2.0)
+            elif step == 2:
+                if cycle_index % 3 == 0 and builder.can_submit_market("buy"):
+                    builder.add_market("thin_market_buy", "buy", 1.0)
+                elif builder.best_ask_price() is not None:
+                    builder.add_limit("thin_cross_buy", "buy", builder.best_ask_price(), 1.5)
+                else:
+                    builder.add_limit("thin_reset_bid", "buy", best_bid_price, 1.5)
+            elif step == 3:
+                builder.add_limit("thin_deep_bid", "buy", deep_bid_price, 1.0)
+            elif step == 4:
+                builder.add_limit("thin_deep_ask", "sell", deep_ask_price, 1.0)
+            elif step == 5:
+                if cycle_index % 3 == 1 and builder.can_submit_market("sell"):
+                    builder.add_market("thin_market_sell", "sell", 1.0)
+                elif builder.best_bid_price() is not None:
+                    builder.add_limit("thin_cross_sell", "sell", builder.best_bid_price(), 1.5)
+                else:
+                    builder.add_limit("thin_reset_ask", "sell", best_ask_price, 1.5)
+            elif step == 6:
+                if not builder.cancel_oldest("buy"):
+                    builder.add_limit("thin_refresh_bid", "buy", best_bid_price, 1.0)
+            elif step == 7:
+                if not builder.cancel_oldest("sell"):
+                    builder.add_limit("thin_refresh_ask", "sell", best_ask_price, 1.0)
+            elif step == 8:
+                if builder.best_bid_price() is None:
+                    builder.add_limit("thin_end_bid", "buy", best_bid_price, 2.0)
+                else:
+                    builder.add_limit("thin_support_bid", "buy", best_bid_price, 1.0)
+            else:
+                if builder.best_ask_price() is None:
+                    builder.add_limit("thin_end_ask", "sell", best_ask_price, 2.0)
+                else:
+                    builder.add_limit("thin_support_ask", "sell", best_ask_price, 1.0)
+
+            cycle_so_far += 1
+
+        return builder.events
 
     @staticmethod
     def _high_volatility(n: int) -> list[Event]:
@@ -522,37 +646,58 @@ class DataLoader:
         Preconditions:
         - n >= 0
         """
-        base_time = datetime.now()
-        synthetic_events = []
-        current_price = 100.0
+        builder = _SyntheticScenarioBuilder()
+        cycle_so_far = 0
+        anchor_mid = 100.0
+        mid_offsets = (0.0, 1.6, -1.2, 2.4, -1.8, 0.9, -2.1, 1.3)
 
-        for i in range(n):
-            timestamp = base_time + timedelta(seconds=i)
-            side = 'buy' if i % 2 == 0 else 'sell'
+        while len(builder.events) < n:
+            step = cycle_so_far % 12
+            cycle_index = cycle_so_far // 12
+            reference_mid = anchor_mid + mid_offsets[cycle_index % len(mid_offsets)]
+            best_bid_price = round(reference_mid - 0.7, 2)
+            best_ask_price = round(reference_mid + 0.7, 2)
+            deep_bid_price = round(reference_mid - 1.5, 2)
+            deep_ask_price = round(reference_mid + 1.5, 2)
+            support_bid_price = round(reference_mid - 0.4, 2)
+            support_ask_price = round(reference_mid + 0.4, 2)
 
-            if i % 4 == 0:
-                current_price += 3.0
-            elif i % 4 == 1:
-                current_price -= 2.5
-            elif i % 4 == 2:
-                current_price += 4.0
+            if step == 0:
+                builder.add_limit("vol_bid", "buy", best_bid_price, 5.0)
+            elif step == 1:
+                builder.add_limit("vol_ask", "sell", best_ask_price, 5.0)
+            elif step == 2:
+                builder.add_limit("vol_deep_bid", "buy", deep_bid_price, 4.0)
+            elif step == 3:
+                builder.add_limit("vol_deep_ask", "sell", deep_ask_price, 4.0)
+            elif step == 4:
+                builder.add_limit("vol_cross_buy", "buy", round(reference_mid + 2.2, 2), 7.0)
+            elif step == 5:
+                if builder.can_submit_market("buy"):
+                    builder.add_market("vol_market_buy", "buy", 3.0)
+                else:
+                    builder.add_limit("vol_reset_ask", "sell", best_ask_price, 3.0)
+            elif step == 6:
+                builder.add_limit("vol_cross_sell", "sell", round(reference_mid - 2.2, 2), 7.0)
+            elif step == 7:
+                if builder.can_submit_market("sell"):
+                    builder.add_market("vol_market_sell", "sell", 3.0)
+                else:
+                    builder.add_limit("vol_reset_bid", "buy", best_bid_price, 3.0)
+            elif step == 8:
+                if not builder.cancel_oldest("buy"):
+                    builder.add_limit("vol_refresh_bid", "buy", best_bid_price, 3.0)
+            elif step == 9:
+                if not builder.cancel_oldest("sell"):
+                    builder.add_limit("vol_refresh_ask", "sell", best_ask_price, 3.0)
+            elif step == 10:
+                builder.add_limit("vol_support_bid", "buy", support_bid_price, 2.0)
             else:
-                current_price -= 3.5
+                builder.add_limit("vol_support_ask", "sell", support_ask_price, 2.0)
 
-            if i % 5 == 0:
-                event = Event(timestamp, f"volatility_order_{i}", side, 'market', None, 5.0 + (i % 4) * 2.0)
-            else:
-                event = Event(
-                    timestamp,
-                    f"volatility_order_{i}",
-                    side,
-                    'limit',
-                    current_price,
-                    5.0 + (i % 4) * 2.0
-                )
-            synthetic_events.append(event)
+            cycle_so_far += 1
 
-        return synthetic_events
+        return builder.events
 
     def validate(self) -> list[str]:
         """Return a list of data-quality errors found in this loader's events."""

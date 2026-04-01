@@ -388,7 +388,7 @@ def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
     """Print a summary of the completed Quantyze run.
 
     The summary may include execution metrics from the matching engine and any
-    available ML-related results, such as the agent's total P&L.
+    available ML-related results, such as the agent's current mark-to-market P&L.
     """
 
     metrics = engine.compute_metrics()
@@ -414,7 +414,7 @@ def print_summary(engine: MatchingEngine, agent: Agent | None) -> None:
         print(f"Mid Price: {mid_price}")
 
     if agent is not None:
-        print(f"Total P&L: {agent.total_pnl()}")
+        print(f"Current Mark-to-Market P&L: {agent.current_pnl()}")
 
     print("=" * 30)
 
