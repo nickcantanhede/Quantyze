@@ -108,7 +108,7 @@ def overlay_mode_text(mode: object) -> str:
 
 def _default_active_model_mode() -> str:
     """Return the shipped default overlay mode for this environment."""
-    return "baseline" if checkpoint_exists(MODEL_PATH) else "none"
+    return "baseline"
 
 
 def _default_no_model_note() -> str:
@@ -119,6 +119,16 @@ def _default_no_model_note() -> str:
             f"{DATASET_PACKAGE_PATH} beside main.py to enable the baseline overlay."
         )
     return "No packaged checkpoint is available; running without a model."
+
+
+def _baseline_unavailable_note() -> str:
+    """Return the clearest note for an unavailable packaged baseline checkpoint."""
+    if os.path.exists(DATASET_PACKAGE_PATH):
+        return (
+            "Baseline overlay is the default packaged option, but its checkpoint is "
+            f"not extracted yet. Extract {DATASET_PACKAGE_PATH} beside main.py to enable it."
+        )
+    return "Baseline overlay is the default packaged option, but its checkpoint is unavailable."
 
 
 def dataset_label_for_path(dataset_path: str | None) -> str:
@@ -323,13 +333,11 @@ def _requested_mode_from_payload(
 ) -> tuple[str, bool, str]:
     """Return the requested mode, explicit-selection flag, and any fallback note."""
     if raw_payload is None:
-        if default_mode == "baseline":
-            return (
-                default_mode,
-                False,
-                "Active model state was missing or invalid; using the packaged baseline model.",
-            )
-        return default_mode, False, _default_no_model_note()
+        return (
+            default_mode,
+            False,
+            "Active model state was missing or invalid; using the packaged baseline model.",
+        )
 
     explicit_selection = bool(raw_payload.get("user_selected"))
     if explicit_selection:
@@ -338,13 +346,11 @@ def _requested_mode_from_payload(
     if str(raw_payload["mode"]) == default_mode:
         return default_mode, False, ""
 
-    if default_mode == "baseline":
-        return (
-            default_mode,
-            False,
-            "No explicit overlay selection was found; using the packaged baseline model.",
-        )
-    return default_mode, False, _default_no_model_note()
+    return (
+        default_mode,
+        False,
+        "No explicit overlay selection was found; using the packaged baseline model.",
+    )
 
 
 def _resolved_payload_for_mode(
@@ -369,16 +375,19 @@ def _resolved_payload_for_mode(
                 "Latest checkpoint was unavailable; fell back to the baseline model.",
             )
         return (
-            _active_model_payload("none", user_selected=explicit_selection),
-            "Latest checkpoint was unavailable; running without a model.",
+            _active_model_payload("baseline", user_selected=explicit_selection),
+            (
+                "Latest checkpoint was unavailable. "
+                + _baseline_unavailable_note()
+            ),
         )
 
     if requested_mode == "baseline":
         if checkpoint_exists(MODEL_PATH):
             return _active_model_payload("baseline", user_selected=explicit_selection), ""
         return (
-            _active_model_payload("none", user_selected=explicit_selection),
-            "Baseline checkpoint was unavailable; running without a model.",
+            _active_model_payload("baseline", user_selected=explicit_selection),
+            _baseline_unavailable_note(),
         )
 
     return _active_model_payload("none", user_selected=explicit_selection), ""
