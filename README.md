@@ -128,11 +128,11 @@ The final submission tree is intentionally flat. The key files are:
 - `web.py`: Flask browser UI and API wiring
 - `index.html`, `ui.css`, `ui.js`: browser-side files for the web UI
 - `project_report.tex`
-- `project_report.pdf` in the final submission package
-- `submission_checklist.md`
 - `quantyze_datasets.zip`
 - `requirements.txt`
 - `active_model.json`
+
+The final MarkUs submission should also include the compiled `project_report.pdf`.
 
 ## Useful Entrypoints
 

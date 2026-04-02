@@ -88,6 +88,19 @@ class OrderBook:
         """Look up order_id in order_index, mark the order cancelled, remove it from
         its PriceLevel queue, and prune empty price nodes. Return whether the
         cancellation succeeded.
+
+        >>> from datetime import datetime
+        >>> from orders import Event
+        >>> book = OrderBook()
+        >>> book.add_limit_order(
+        ...     Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.5, 3.0))
+        ... )
+        >>> book.cancel_order('b1')
+        True
+        >>> book.best_bid() is None
+        True
+        >>> 'b1' in book.order_index
+        False
         """
 
         if order_id not in self.order_index:
@@ -157,6 +170,21 @@ class OrderBook:
 
         Shape is ``{'bids': [...], 'asks': [...]}`` with each side a list of
         ``(price, volume)`` tuples suitable for charts and API responses.
+
+        >>> from datetime import datetime
+        >>> from orders import Event
+        >>> book = OrderBook()
+        >>> book.add_limit_order(
+        ...     Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.0, 1.0))
+        ... )
+        >>> book.add_limit_order(
+        ...     Order(Event(datetime(2026, 1, 1, 9, 30, 1), 'b2', 'buy', 'limit', 98.5, 2.0))
+        ... )
+        >>> book.add_limit_order(
+        ...     Order(Event(datetime(2026, 1, 1, 9, 30, 2), 's1', 'sell', 'limit', 100.0, 1.5))
+        ... )
+        >>> book.depth_snapshot(levels=1)
+        {'bids': [(99.0, 1.0)], 'asks': [(100.0, 1.5)]}
         """
 
         bid_nodes = self.bids.inorder()

@@ -72,8 +72,8 @@ as buy, sell, or hold from order-book state.}
 
 The project kept the same core direction as our proposal, but the final version
 organizes the submission around a browser display launched from
-\texttt{main.py}, with a terminal option for the same simulator and training
-logic. That let us present the project in a PyCharm-friendly way without
+\texttt{main.py}, with a terminal-menu fallback for the same simulator and
+training logic. That let us present the project in a PyCharm-friendly way without
 changing the main computational challenge: representing and updating a live
 order book efficiently with trees while connecting the simulator to a
 meaningful data and model-training pipeline. In the language of our original
@@ -163,8 +163,8 @@ contains:
 \end{itemize}
 
 After extraction, these files are expected to sit beside \texttt{main.py}. Both
-the terminal and UI runs look
-for the packaged datasets and shipped baseline artifacts there.
+the browser UI and the terminal menu look for the packaged datasets and
+shipped baseline artifacts there.
 
 The intended roles of these packaged files are:
 \begin{itemize}
@@ -283,7 +283,7 @@ At the end of a normal run, the simulation runtime reports:
 The same simulation and training state is surfaced in two ways:
 \begin{itemize}
     \item the browser UI launched by \texttt{main.py}
-    \item the optional terminal fallback opened through
+    \item the optional terminal menu opened through
     \texttt{main(run\_ui=False)}
 \end{itemize}
 
@@ -413,34 +413,16 @@ controls replay speed, and selects the overlay mode. \texttt{Train} runs the
 packaged internal datasets, the packaged LOBSTER message-file path, or a custom
 CSV path. \texttt{Artifacts} reports the active overlay state, saved
 checkpoints, metrics files, and latest training outputs. \texttt{Charts}
-renders order-book depth and execution-price history after a simulation.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{ui_simulate_tab.png}
-\caption{The \texttt{Simulate} tab of the Quantyze browser UI
-(\texttt{http://127.0.0.1:9000}). The TA selects a synthetic scenario or CSV
-dataset, sets replay speed, and chooses the active model overlay before
-running the simulation.}
-\label{fig:ui-simulate}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{ui_charts_tab.png}
-\caption{The \texttt{Charts} tab after a simulation. The left panel shows the
-current order-book depth as a horizontal bar chart (bids in green, asks in
-red). The right panel plots execution prices over fill index, coloured by
-side. The table below lists the 50 most recent fills with timestamp, side,
-price, quantity, and maker order id.}
-\label{fig:ui-charts}
-\end{figure}
+renders order-book depth and execution-price history after a simulation. The
+backup terminal path uses \texttt{terminal\_menu.py}, but the intended TA
+workflow is the browser UI.
 
 The active overlay choice is stored in \texttt{active\_model.json}, which
 makes the browser workflow persistent across runs. For submission readiness, we
 split the orchestration code into \texttt{config.py}, \texttt{simulation.py},
-\texttt{training.py}, \texttt{api\_payloads.py}, and \texttt{web.py}, while
-keeping \texttt{main.py} as a small entry point.
+\texttt{training.py}, \texttt{api\_payloads.py}, \texttt{web.py}, and
+\texttt{terminal\_menu.py}, while keeping \texttt{main.py} as a small entry
+point.
 
 \subsection*{3.5 Overall Computational Complexity}
 Quantyze demonstrates computational complexity in all three major ways
@@ -457,7 +439,7 @@ highlighted by the project rubric.
     cancellation/indexing logic are all custom project code rather than thin
     wrappers around third-party libraries.
     \item \textbf{Non-trivial reporting and interactivity:} the browser UI,
-    terminal run, saved-state workflow, metrics inspection, and
+    terminal menu, saved-state workflow, metrics inspection, and
     execution-log reporting make the program substantially more interactive
     than a single fixed command.
 \end{itemize}
@@ -564,28 +546,8 @@ running \texttt{main.py} and opening the printed local URL:
     behavior.
 \end{enumerate}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{ui_train_tab.png}
-\caption{The \texttt{Train} tab. The TA selects a training dataset
-(\texttt{sample\_internal.csv}, \texttt{huge\_internal.csv}, the packaged
-LOBSTER pair, or a custom CSV path), then clicks \textbf{Start Training}.
-The panel summarises the pipeline configuration before the run begins.}
-\label{fig:ui-train}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.82\textwidth]{ui_artifacts_tab.png}
-\caption{The \texttt{Artifacts} tab. It shows the active model overlay mode
-and provenance, the file status of all saved checkpoints and metrics
-artifacts, the baseline and latest training metrics side by side, and a
-preview of the most recent execution log records.}
-\label{fig:ui-artifacts}
-\end{figure}
-
 \subsection*{4.5 How the TA Should Interpret the Output}
-The browser UI summaries and terminal fallback contain the same two classes of
+The browser UI summaries and terminal menu contain the same two classes of
 information, and keeping them separate is the key to understanding Quantyze.
 
 \subsubsection*{Simulation Run Configuration}
@@ -649,7 +611,7 @@ inventory and a negative mark-to-market value even when the matching engine
 itself is behaving correctly.
 
 \subsubsection*{Training Metrics}
-The \texttt{Train} tab and the terminal fallback report validation accuracy,
+The \texttt{Train} tab and the terminal menu report validation accuracy,
 majority-class baseline, per-class recall, and the confusion matrix. These
 values measure how
 well the classifier reproduces the label rule derived from future midpoint
@@ -676,8 +638,10 @@ overlay rather than becoming the center of the project.
 On the implementation side, we ended with a clearer module split than we
 originally imagined: \texttt{config.py} holds shared constants and overlay
 state, \texttt{simulation.py} owns replay orchestration, \texttt{training.py}
-owns classifier training, \texttt{web.py} serves the browser UI, and
-\texttt{main.py} is now a small entry point.
+owns classifier training, \texttt{api\_payloads.py} owns browser-API response
+serialization, \texttt{web.py} serves the browser UI,
+\texttt{terminal\_menu.py} owns the backup terminal flow, and \texttt{main.py}
+is now a small entry point.
 
 Our frontend plan also changed. The proposal left room for a heavier
 React/Plotly-style interface, but the final submission uses a lightweight
@@ -741,7 +705,7 @@ just to maximize predictive accuracy. It was to build a full computational
 pipeline from market events to order-book state to derived features to model
 output. In that sense, the ML side is successful: it uses both synthetic and
 real-data paths, produces saved checkpoints, supports inference inside the
-simulator, and can be retrained from the browser UI or the terminal fallback.
+simulator, and can be retrained from the browser UI or the terminal menu.
 
 We also ran into clear limitations. Synthetic data is easy to test and reason
 about, but it is not enough to justify a strong predictive claim. Real LOBSTER
