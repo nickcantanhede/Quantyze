@@ -263,7 +263,22 @@ class MatchingEngine:
             best_ask = self.book.best_ask()
 
     def compute_metrics(self) -> dict:
-        """Return the aggregate execution metrics for this engine."""
+        """Return the aggregate execution metrics for this engine.
+
+        >>> from datetime import datetime
+        >>> book = OrderBook()
+        >>> engine = MatchingEngine(book)
+        >>> engine.process_event(Event(datetime(2026, 1, 1, 9, 30), 'ask1', 'sell', 'limit', 100.0, 2.0))
+        []
+        >>> _ = engine.process_event(
+        ...     Event(datetime(2026, 1, 1, 9, 30, 1), 'buy1', 'buy', 'limit', 100.0, 1.0)
+        ... )
+        >>> metrics = engine.compute_metrics()
+        >>> (metrics['total_filled'], metrics['fill_count'], metrics['cancel_count'])
+        (1.0, 1, 0)
+        >>> metrics['average_slippage']
+        0.0
+        """
 
         metrics_copy = self.metrics.copy()
 

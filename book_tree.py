@@ -140,6 +140,18 @@ class BookTree:
         """Delete the PriceLevel at <price> from this tree.
 
         Raise KeyError if <price> is not stored in this tree.
+
+        >>> bids = BookTree('bid')
+        >>> bids.insert(PriceLevel(99.5))
+        >>> bids.insert(PriceLevel(100.0))
+        >>> bids.insert(PriceLevel(98.0))
+        >>> 99.5 in bids
+        True
+        >>> bids.delete(99.5)
+        >>> [level.price for level in bids.inorder()]
+        [98.0, 100.0]
+        >>> len(bids)
+        2
         """
 
         if price in self:

@@ -193,7 +193,21 @@ class PriceLevel:
         return order
 
     def pop_order_id(self, order_id: str) -> Order | None:
-        """Remove the order for ``order_id`` anywhere in the queue; adjust volume."""
+        """Remove the order for ``order_id`` anywhere in the queue; adjust volume.
+
+        >>> from datetime import datetime
+        >>> from orders import Event
+        >>> level = PriceLevel(100.0)
+        >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30), 'a1', 'sell', 'limit', 100.0, 2.0)))
+        >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30, 1), 'a2', 'sell', 'limit', 100.0, 3.0)))
+        >>> removed = level.pop_order_id('a2')
+        >>> removed.order_id
+        'a2'
+        >>> level.volume
+        2.0
+        >>> level.peek_order().order_id
+        'a1'
+        """
 
         order = self.orders.remove_id(order_id)
         if order is None:
@@ -215,6 +229,12 @@ class PriceLevel:
         """Return up to ``levels`` (price, volume) pairs from this subtree.
 
         The snapshot is returned in ascending price order.
+
+        >>> root = PriceLevel(100.0, volume=3.0)
+        >>> root.left = PriceLevel(99.5, volume=2.0)
+        >>> root.right = PriceLevel(100.5, volume=4.0)
+        >>> root.depth_snapshot(2)
+        [(99.5, 2.0), (100.0, 3.0)]
         """
 
         if levels <= 0:
