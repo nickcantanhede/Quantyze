@@ -60,9 +60,9 @@
               <div id="csv-opts" class="sub-opts hidden">
                 <input type="text" id="data-path-inp" class="txt-inp" placeholder="Path to CSV file">
                 <div class="preset-row">
-                  <button class="preset-btn" data-path="sample_internal.csv">Sample</button>
-                  <button class="preset-btn" data-path="huge_internal.csv">Huge</button>
-                  <button class="preset-btn" data-path="aapl_lobster_2012-06-21_message_5level_sample.csv">LOBSTER</button>
+                  <button id="sim-preset-sample" class="preset-btn" data-preset="sample">Sample</button>
+                  <button id="sim-preset-huge" class="preset-btn" data-preset="huge">Huge</button>
+                  <button id="sim-preset-lobster" class="preset-btn" data-preset="lobster">LOBSTER</button>
                 </div>
               </div>
             </div>
@@ -138,15 +138,15 @@
             <div class="field-group">
               <label class="radio-row">
                 <input type="radio" name="train-src" value="sample" checked>
-                <span>Sample <span class="muted">— sample_internal.csv</span></span>
+                <span><span id="train-src-sample-label">Sample</span> <span class="muted" id="train-src-sample-meta">— sample_internal.csv</span></span>
               </label>
               <label class="radio-row">
                 <input type="radio" name="train-src" value="huge">
-                <span>Huge <span class="muted">— huge_internal.csv (slower)</span></span>
+                <span><span id="train-src-huge-label">Huge</span> <span class="muted" id="train-src-huge-meta">— huge_internal.csv (slower)</span></span>
               </label>
               <label class="radio-row">
                 <input type="radio" name="train-src" value="lobster">
-                <span>LOBSTER <span class="muted">— AAPL 2012 (slower)</span></span>
+                <span><span id="train-src-lobster-label">LOBSTER</span> <span class="muted" id="train-src-lobster-meta">— AAPL 2012 sample pair (slower)</span></span>
               </label>
               <label class="radio-row">
                 <input type="radio" name="train-src" value="custom">
@@ -159,12 +159,12 @@
           <div class="card info-card">
             <div class="card-hd">What Happens During Training</div>
             <ul class="info-list">
-              <li>Replays events → extracts 16 order-book features per event</li>
-              <li>Labels each step: buy / sell / hold (50-event lookahead)</li>
-              <li>80 % train · 20 % validation split (random seed 111)</li>
-              <li>3-layer MLP · 50 epochs · Adam optimizer (lr = 3e-4)</li>
-              <li>Saves checkpoint → <code>latest_model.pt</code></li>
-              <li>Saves metrics → <code>latest_training_metrics.json</code></li>
+              <li>Replays events → extracts <span id="training-feature-dim">16</span> order-book features per event</li>
+              <li>Labels each step: buy / sell / hold (<span id="training-label-horizon">50</span>-event lookahead)</li>
+              <li><span id="training-train-split">80</span> % train · <span id="training-val-split">20</span> % validation split (random seed <span id="training-split-seed">111</span>)</li>
+              <li>3-layer MLP · <span id="training-epochs">50</span> epochs · <span id="training-optimizer">Adam</span> optimizer (lr = <span id="training-learning-rate">3e-4</span>)</li>
+              <li>Saves checkpoint → <code id="training-latest-model-path">latest_model.pt</code></li>
+              <li>Saves metrics → <code id="training-latest-metrics-path">latest_training_metrics.json</code></li>
             </ul>
           </div>
 

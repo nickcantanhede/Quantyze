@@ -14,15 +14,18 @@ const LOG_LINES = 400;   // max lines kept in log display
 /* ─── state ─────────────────────────────────────────────────────────────── */
 let simPollId    = null;
 let trainPollId  = null;
-let chartPollId  = null;
 let depthChart   = null;
 let fillsChart   = null;
+let appConfig    = null;
 
 /* ─── DOM helpers ────────────────────────────────────────────────────────── */
 const $  = id => document.getElementById(id);
 const show   = id => $(id) && $(id).classList.remove('hidden');
 const hide   = id => $(id) && $(id).classList.add('hidden');
-const hasEl  = id => !!$(id);
+const setText = (id, value) => {
+  const el = $(id);
+  if (el) el.textContent = String(value);
+};
 
 /* ─── fetch helpers ──────────────────────────────────────────────────────── */
 async function apiGet(url) {
@@ -37,10 +40,6 @@ async function apiPost(url, body) {
   });
   return { ok: r.ok, status: r.status, data: await r.json() };
 }
-async function apiDelete(url) {
-  const r = await fetch(url, { method: 'DELETE' });
-  return r.json();
-}
 
 /* ─── number formatting ──────────────────────────────────────────────────── */
 function fmt2(v)  { return (v == null) ? '—' : Number(v).toFixed(2); }
@@ -53,9 +52,72 @@ function fmtKB(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function sumCounts(values) {
+  if (!Array.isArray(values)) return null;
+  return values.reduce((total, value) => total + Number(value || 0), 0);
+}
+
 function overlayModeText(mode) {
   const labels = { baseline: 'Baseline', latest: 'Latest', none: 'None' };
   return labels[mode] || String(mode || '—');
+}
+
+function latestModelPath() {
+  return appConfig?.training?.output_files?.latest_model || 'latest_model.pt';
+}
+
+function latestMetricsPath() {
+  return appConfig?.training?.output_files?.latest_metrics || 'latest_training_metrics.json';
+}
+
+function applyDatasetPresetButtons(presets) {
+  const presetMap = Object.fromEntries((presets || []).map(preset => [preset.id, preset]));
+  document.querySelectorAll('.preset-btn[data-preset]').forEach(btn => {
+    const preset = presetMap[btn.dataset.preset];
+    if (!preset) return;
+    btn.textContent = preset.button_label || preset.label || btn.textContent;
+    btn.dataset.path = preset.path || '';
+  });
+}
+
+function applyTrainingPresetLabels(presets) {
+  const presetMap = Object.fromEntries((presets || []).map(preset => [preset.id, preset]));
+  for (const presetId of ['sample', 'huge', 'lobster']) {
+    const preset = presetMap[presetId];
+    if (!preset) continue;
+    setText(`train-src-${presetId}-label`, preset.label || presetId);
+    setText(`train-src-${presetId}-meta`, `— ${preset.meta || preset.path || ''}`);
+  }
+}
+
+function applyTrainingSummaryConfig(training) {
+  if (!training) return;
+  setText('training-feature-dim', training.feature_dim ?? 16);
+  setText('training-label-horizon', training.label_horizon_events ?? 50);
+  setText('training-train-split', training.train_split_percent ?? 80);
+  setText('training-val-split', training.val_split_percent ?? 20);
+  setText('training-split-seed', training.split_seed ?? 111);
+  setText('training-epochs', training.epochs ?? 50);
+  setText('training-optimizer', training.optimizer || 'Adam');
+  setText('training-learning-rate', training.learning_rate ?? '3e-4');
+  setText('training-latest-model-path', latestModelPath());
+  setText('training-latest-metrics-path', latestMetricsPath());
+}
+
+function applyAppConfig(config) {
+  if (!config) return;
+  applyDatasetPresetButtons(config.simulation?.csv_presets);
+  applyTrainingPresetLabels(config.training?.presets);
+  applyTrainingSummaryConfig(config.training);
+}
+
+async function loadAppConfig() {
+  try {
+    appConfig = await apiGet('/api/config');
+    applyAppConfig(appConfig);
+  } catch (_) {
+    appConfig = null;
+  }
 }
 
 /* ─── tab switching ──────────────────────────────────────────────────────── */
@@ -392,7 +454,7 @@ function renderTrainResults(r) {
       </div>
 
       <div class="alert alert-ok" style="margin-top:var(--s3)">
-        Checkpoint saved → <code>latest_model.pt</code>
+        Checkpoint saved → <code>${escHtml(latestModelPath())}</code>
       </div>
     </div>`;
   show('train-results-panel');
@@ -490,18 +552,39 @@ function renderArtifacts(art, baseline, latest, logSum) {
     if (!m) return `<div class="card"><div class="card-hd">${title}</div><div class="field-hint">Not available.</div></div>`;
     const acc  = m.val_accuracy != null ? (m.val_accuracy * 100).toFixed(2) + '%' : '—';
     const base = m.majority_baseline_accuracy != null ? (m.majority_baseline_accuracy * 100).toFixed(2) + '%' : '—';
+    const datasetLabel = m.dataset_label || m.dataset_path || '—';
+    const valExamples = m.val_examples != null ? m.val_examples : sumCounts(m.val_true_counts);
+    const fingerprint = m.training_config_fingerprint || '—';
+    const datasetHash = m.dataset_sha256 ? String(m.dataset_sha256).slice(0, 12) : '—';
     return `<div class="card">
       <div class="card-hd">${title}</div>
       <div class="overlay-info-row"><span class="key">Val accuracy</span><span class="val">${acc}</span></div>
       <div class="overlay-info-row"><span class="key">Majority baseline</span><span class="val">${base}</span></div>
-      <div class="overlay-info-row"><span class="key">Dataset</span><span class="val">${escHtml(m.dataset_path || '—')}</span></div>
+      <div class="overlay-info-row"><span class="key">Source dataset</span><span class="val">${escHtml(datasetLabel)}</span></div>
+      <div class="overlay-info-row"><span class="key">Validation examples</span><span class="val">${escHtml(valExamples ?? '—')}</span></div>
+      <div class="overlay-info-row"><span class="key">Dataset hash</span><span class="val"><code>${escHtml(datasetHash)}</code></span></div>
+      <div class="overlay-info-row"><span class="key">Config fingerprint</span><span class="val"><code>${escHtml(fingerprint)}</code></span></div>
     </div>`;
+  }
+
+  let metricsNote = '';
+  if (baseline && latest) {
+    const sameDataset = (baseline.dataset_sha256 || baseline.dataset_path) === (latest.dataset_sha256 || latest.dataset_path);
+    const sameConfig = baseline.training_config_fingerprint && latest.training_config_fingerprint
+      && baseline.training_config_fingerprint === latest.training_config_fingerprint;
+    if (sameDataset && !sameConfig) {
+      metricsNote = `
+        <div class="alert alert-info">
+          Baseline and latest metrics point to the same source dataset label, but they were generated with different training configurations or preprocessing metadata.
+        </div>`;
+    }
   }
 
   return `
     <div class="artifacts-grid">
       ${overlayHtml}
       ${filesHtml}
+      ${metricsNote}
       ${metricsCard('Baseline Training Metrics', baseline)}
       ${metricsCard('Latest Training Metrics', latest)}
       ${logHtml}
@@ -663,10 +746,11 @@ function escHtml(s) {
 }
 
 /* ─── boot ───────────────────────────────────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initTabs();
   initSourceToggle();
   initTrainToggle();
+  await loadAppConfig();
   loadOverlayNote();
 
   // Chart.js global defaults — dark theme

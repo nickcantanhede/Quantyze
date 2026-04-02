@@ -107,13 +107,18 @@ class Trainer:
     device: torch.device
     history: dict[str, list[float]]
 
-    def __init__(self, model: OrderBookNet, class_weights: Tensor | None = None) -> None:
+    def __init__(
+        self,
+        model: OrderBookNet,
+        class_weights: Tensor | None = None,
+        learning_rate: float = 3e-4
+    ) -> None:
         """Attach Adam, optional weighted cross-entropy, and move model to CPU/CUDA."""
 
         self.model = model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=3e-4)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         if class_weights is not None:
             class_weights = class_weights.to(self.device).float()
         self.criterion = nn.CrossEntropyLoss(weight=class_weights)
