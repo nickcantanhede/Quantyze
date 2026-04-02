@@ -181,11 +181,10 @@ The intended roles of these packaged files are:
 The package also includes saved metrics and a baseline checkpoint, so the TA
 can use the model path without retraining first.
 
-The packaged datasets and baseline artifacts are local. The one browser-side
-runtime dependency that is still external is the \texttt{Chart.js} CDN used by
-the \texttt{Charts} tab, so viewing those browser charts assumes a normal
-internet connection even though the datasets and checkpoints are bundled with
-the submission.
+The packaged datasets and baseline artifacts are local, but the
+\texttt{Charts} tab loads \texttt{Chart.js} from a standard CDN, so the
+intended TA path assumes a normal internet connection, with the terminal menu
+remaining the documented backup method.
 
 \section*{3. Computational Overview}
 \subsection*{3.1 Core Data Representation}
@@ -527,11 +526,6 @@ This path makes four things explicit at all times:
     \item where that checkpoint came from
     \item what to do next: simulate, train, or inspect artifacts
 \end{itemize}
-
-The packaged datasets and baseline artifacts are local, but the browser
-\texttt{Charts} tab loads \texttt{Chart.js} from a standard CDN. That means
-browser chart rendering assumes a normal internet connection even though the
-submission data and checkpoint files are bundled locally.
 
 \subsection*{4.4 Recommended TA Demo}
 The clearest way to understand the project is the following walkthrough after
