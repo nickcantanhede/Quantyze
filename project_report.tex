@@ -8,6 +8,7 @@
 \usepackage{enumitem}
 \usepackage{amsmath}
 \usepackage{float}
+\usepackage{wrapfig}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 \setlist[itemize]{topsep=0.25em, itemsep=0.25em}
@@ -424,6 +425,20 @@ split the orchestration code into \texttt{config.py}, \texttt{simulation.py},
 \texttt{terminal\_menu.py}, while keeping \texttt{main.py} as a small entry
 point.
 
+\begin{wrapfigure}{r}{0.52\textwidth}
+\centering
+\includegraphics[width=0.50\textwidth]{ui_simulate_tab.png}
+\caption{Simulate tab: scenario selector, overlay mode, and replay controls.}
+\label{fig:ui-simulate}
+\end{wrapfigure}
+
+\begin{wrapfigure}{r}{0.52\textwidth}
+\centering
+\includegraphics[width=0.50\textwidth]{ui_charts_tab.png}
+\caption{Charts tab: order-book depth and execution-price history after a run.}
+\label{fig:ui-charts}
+\end{wrapfigure}
+
 \subsection*{3.5 Overall Computational Complexity}
 Quantyze demonstrates computational complexity in all three major ways
 highlighted by the project rubric.
@@ -545,6 +560,20 @@ running \texttt{main.py} and opening the printed local URL:
     difference between \textit{market replay} and \textit{agent overlay}
     behavior.
 \end{enumerate}
+
+\begin{wrapfigure}{r}{0.52\textwidth}
+\centering
+\includegraphics[width=0.50\textwidth]{ui_train_tab.png}
+\caption{Train tab: dataset selector, training progress, and live accuracy readout.}
+\label{fig:ui-train}
+\end{wrapfigure}
+
+\begin{wrapfigure}{r}{0.52\textwidth}
+\centering
+\includegraphics[width=0.50\textwidth]{ui_artifacts_tab.png}
+\caption{Artifacts tab: overlay status, saved checkpoint paths, and baseline vs.\ latest metrics.}
+\label{fig:ui-artifacts}
+\end{wrapfigure}
 
 \subsection*{4.5 How the TA Should Interpret the Output}
 The browser UI summaries and terminal menu contain the same two classes of

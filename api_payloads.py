@@ -59,14 +59,12 @@ def book_summary_payload(book: OrderBook, agent: Agent | None) -> dict[str, Any]
     >>> payload['agent'] is None
     True
     """
-    payload: dict[str, Any] = {
-        "best_bid": price_level_top(book.best_bid()),
-        "best_ask": price_level_top(book.best_ask()),
-        "spread": book.spread(),
-        "mid_price": book.mid_price(),
-    }
-    payload["agent"] = {"current_pnl": agent.current_pnl()} if agent is not None else None
-    return payload
+
+    payload_summary: dict[str, Any] = {"best_bid": price_level_top(book.best_bid()),
+                                       "best_ask": price_level_top(book.best_ask()), "spread": book.spread(),
+                                       "mid_price": book.mid_price(),
+                                       "agent": {"current_pnl": agent.current_pnl()} if agent is not None else None}
+    return payload_summary
 
 
 def book_depth_payload(book: OrderBook, levels: int) -> dict[str, Any]:
