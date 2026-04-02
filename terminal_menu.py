@@ -27,7 +27,23 @@ DATASET_PACKAGE_PATH = "quantyze_datasets.zip"
 
 @dataclass(frozen=True)
 class MenuPaths:
-    """Runtime file paths used by the interactive menu."""
+    """Runtime file paths used by the terminal menu.
+
+    Instance Attributes:
+    - model_path: the packaged baseline checkpoint path
+    - training_metrics_path: the packaged baseline metrics path
+    - latest_model_path: the latest retrained checkpoint path
+    - latest_training_metrics_path: the latest retrained metrics path
+    - latest_training_data_path: the latest exported training-data path
+    - log_path: the execution-log path
+    - active_model_state_path: the persisted overlay-state path
+
+    Representation Invariants:
+    - all(path != '' for path in (
+        self.model_path, self.training_metrics_path, self.latest_model_path,
+        self.latest_training_metrics_path, self.latest_training_data_path,
+        self.log_path, self.active_model_state_path))
+    """
 
     model_path: str
     training_metrics_path: str
@@ -40,7 +56,17 @@ class MenuPaths:
 
 @dataclass(frozen=True)
 class MenuDatasets:
-    """Packaged dataset names and supported synthetic scenarios."""
+    """Packaged dataset names and supported synthetic scenarios.
+
+    Instance Attributes:
+    - sample_dataset_path: the packaged sample internal dataset path
+    - huge_dataset_path: the packaged large internal dataset path
+    - lobster_sample_message_path: the packaged LOBSTER message-file path
+    - scenario_choices: the supported synthetic scenario names
+
+    Representation Invariants:
+    - all(choice != '' for choice in self.scenario_choices)
+    """
 
     sample_dataset_path: str
     huge_dataset_path: str
@@ -50,7 +76,20 @@ class MenuDatasets:
 
 @dataclass(frozen=True)
 class MenuCallbacks:
-    """Callables used by the interactive menu to run project workflows."""
+    """Callback functions used by the terminal menu.
+
+    Instance Attributes:
+    - run_simulation: the simulation callback
+    - train_model: the training callback
+    - get_active_model_status: the overlay-status callback
+    - set_active_model: the overlay-selection callback
+
+    Representation Invariants:
+    - callable(self.run_simulation)
+    - callable(self.train_model)
+    - callable(self.get_active_model_status)
+    - callable(self.set_active_model)
+    """
 
     run_simulation: Callable[[RunArgs], None]
     train_model: Callable[[str], dict[str, object]]
@@ -60,7 +99,18 @@ class MenuCallbacks:
 
 @dataclass(frozen=True)
 class MenuConfig:
-    """Configuration and callbacks used by the interactive menu."""
+    """Configuration and callbacks used by the terminal menu.
+
+    Instance Attributes:
+    - paths: the runtime artifact paths used by the menu
+    - datasets: the packaged dataset names and scenario choices
+    - callbacks: the workflow callbacks used by the menu
+
+    Representation Invariants:
+    - self.paths is not None
+    - self.datasets is not None
+    - self.callbacks is not None
+    """
 
     paths: MenuPaths
     datasets: MenuDatasets

@@ -25,7 +25,17 @@ from orders import Order
 
 
 class _Node:
-    """Internal doubly linked list node holding one ``Order``."""
+    """Doubly linked list node used internally by ``Queue``.
+
+    Instance Attributes:
+    - item: the resting order stored at this node
+    - prev: the previous node in the queue, or None if this node is first
+    - next: the next node in the queue, or None if this node is last
+
+    Representation Invariants:
+    - self.prev is None or self.prev.next is self
+    - self.next is None or self.next.prev is self
+    """
 
     item: Order
     prev: _Node | None
@@ -40,7 +50,17 @@ class _Node:
 
 
 class Queue:
-    """FIFO queue for ``PriceLevel.orders``: head dequeue, tail enqueue, dict for id lookup."""
+    """FIFO queue of resting orders for one price level.
+
+    Instance Attributes:
+    - _nodes: maps each stored order_id to its linked-list node
+    - _head: the front node of the queue, or None if the queue is empty
+    - _tail: the back node of the queue, or None if the queue is empty
+
+    Representation Invariants:
+    - self._head is None if and only if self._tail is None
+    - all(order_id == self._nodes[order_id].item.order_id for order_id in self._nodes)
+    """
 
     _nodes: dict[str, _Node]
     _head: _Node | None
@@ -121,13 +141,18 @@ class Queue:
 class PriceLevel:
     """BST node mapping one price to a FIFO queue of resting orders.
 
-    Attributes:
-        price: The price this node represents; BST search key.
-        orders: FIFO queue; earliest arrival is at the front and matches first.
-        volume: Sum of resting size at this level; kept in sync with enqueue/dequeue
-            and partial fills via update_volume.
-        left: Left child PriceLevel (lower prices) when embedded in a BST.
-        right: Right child PriceLevel (higher prices) when embedded in a BST.
+    Instance Attributes:
+    - price: the price key represented by this level
+    - orders: the FIFO queue of resting orders at this price
+    - volume: the total remaining quantity resting at this price
+    - left: the left child in the BST, or None if absent
+    - right: the right child in the BST, or None if absent
+    - _parent_price: the parent price used only for debugging, or None if unset
+
+    Representation Invariants:
+    - self.volume >= 0
+    - self.left is None or self.left.price < self.price
+    - self.right is None or self.right.price > self.price
     """
 
     price: float

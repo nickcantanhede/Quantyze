@@ -48,7 +48,20 @@ from config import (
 
 @dataclass
 class EvalStats:
-    """Accumulate classifier evaluation counts over validation batches."""
+    """Accumulate classifier evaluation counts over validation batches.
+
+    Instance Attributes:
+    - total: the total number of evaluated examples
+    - correct: the number of correctly classified examples
+    - true_counts: the true class counts by class index
+    - pred_counts: the predicted class counts by class index
+    - confusion_matrix: the square confusion matrix by true/predicted class index
+
+    Representation Invariants:
+    - self.total >= 0
+    - self.correct >= 0
+    - len(self.true_counts) == len(self.pred_counts) == len(self.confusion_matrix)
+    """
 
     total: int
     correct: int
@@ -59,7 +72,20 @@ class EvalStats:
 
 @dataclass(frozen=True)
 class PreparedTrainingData:
-    """Normalized training tensors and index splits for one training run."""
+    """Normalized tensors and index splits for one training run.
+
+    Instance Attributes:
+    - feature_dim: the number of features per example
+    - normalized_features: the full normalized feature tensor
+    - label_tensor: the full label tensor
+    - train_indices: the indices assigned to the training split
+    - val_indices: the indices assigned to the validation split
+    - feature_mean: the per-feature training mean
+    - feature_std: the safe per-feature training standard deviation
+
+    Representation Invariants:
+    - self.feature_dim > 0
+    """
 
     feature_dim: int
     normalized_features: torch.Tensor
@@ -88,7 +114,18 @@ class PreparedTrainingData:
 
 @dataclass(frozen=True)
 class TrainingOutputPaths:
-    """Filesystem destinations produced by one training run."""
+    """Filesystem destinations produced by one training run.
+
+    Instance Attributes:
+    - model_path: the output checkpoint path
+    - metrics_path: the output metrics JSON path
+    - training_data_path: the output exported training-data CSV path
+
+    Representation Invariants:
+    - self.model_path != ''
+    - self.metrics_path != ''
+    - self.training_data_path != ''
+    """
 
     model_path: str
     metrics_path: str

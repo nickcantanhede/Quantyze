@@ -35,7 +35,17 @@ from config import (
 
 @dataclass(frozen=True)
 class RunArgs:
-    """Simple runtime configuration used by the Python entrypoints."""
+    """Runtime configuration for one Quantyze simulation.
+
+    Instance Attributes:
+    - data: the optional CSV path to replay, or None when using a synthetic scenario
+    - scenario: the optional synthetic scenario name, or None when using a CSV path
+    - speed: the non-negative replay speed multiplier
+
+    Representation Invariants:
+    - self.speed >= 0
+    - self.data is None or self.scenario is None
+    """
 
     data: str | None = None
     scenario: str | None = None

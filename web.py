@@ -64,7 +64,19 @@ from training import train_model
 
 
 class _SimulationState:
-    """Mutable browser-side simulation state for one app instance."""
+    """Mutable browser-side simulation state for one app instance.
+
+    Instance Attributes:
+    - state: the current job state label
+    - progress: the current job progress percentage
+    - log: the captured stdout lines for the job
+    - results: the final simulation results payload, or None while unavailable
+    - error: the error message for a failed job, or None if there is no error
+    - runtime: the live in-memory runtime objects for the latest simulation
+
+    Representation Invariants:
+    - self.state in {'idle', 'running', 'done', 'error'}
+    """
 
     state: str
     progress: float
@@ -89,7 +101,18 @@ class _SimulationState:
 
 
 class _TrainingState:
-    """Mutable browser-side training state for one app instance."""
+    """Mutable browser-side training state for one app instance.
+
+    Instance Attributes:
+    - state: the current job state label
+    - progress: the current job progress percentage
+    - log: the captured stdout lines for the job
+    - results: the final training results payload, or None while unavailable
+    - error: the error message for a failed job, or None if there is no error
+
+    Representation Invariants:
+    - self.state in {'idle', 'running', 'done', 'error'}
+    """
 
     state: str
     progress: float
@@ -107,7 +130,16 @@ class _TrainingState:
 
 
 class _TeeStream:
-    """Write to real stdout and capture complete log lines for the web UI."""
+    """Mirror stdout while capturing complete log lines for the web UI.
+
+    Instance Attributes:
+    - _lines: the captured complete log lines
+    - _real: the underlying real stdout stream
+    - _buf: the partial current line buffer
+
+    Representation Invariants:
+    - len(self._buf.split('\\n')) >= 1
+    """
 
     _lines: list[str]
     _real: TextIO

@@ -37,7 +37,19 @@ _BALANCED_SEED_ORDERS = (
 
 @dataclass
 class _SyntheticScenarioBuilder:
-    """Build deterministic synthetic event streams while tracking book state."""
+    """Build deterministic synthetic event streams while tracking book state.
+
+    Instance Attributes:
+    - time_step_seconds: the timestamp gap between successive synthetic events
+    - events: the synthetic events built so far
+    - book: the temporary book used to track the live synthetic state
+    - tracked_order_ids: the live resting order ids tracked by side
+    - engine: the temporary matching engine used to replay synthetic events
+
+    Representation Invariants:
+    - self.time_step_seconds > 0
+    - set(self.tracked_order_ids.keys()) == {'buy', 'sell'}
+    """
 
     time_step_seconds: int = 1
     events: list[Event] = field(default_factory=list)

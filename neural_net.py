@@ -72,7 +72,18 @@ def _load_checkpoint_payload(
 
 
 class OrderBookNet(nn.Module):
-    """Feed-forward classifier: book features -> logits over {buy, sell, hold}."""
+    """Feed-forward classifier from book features to action logits.
+
+    Instance Attributes:
+    - fc1: the first linear layer from feature space to the hidden layer
+    - fc2: the second linear hidden layer
+    - fc3: the output layer producing logits for three classes
+    - relu: the shared ReLU activation module
+    - dropout: the shared dropout module used between layers
+
+    Representation Invariants:
+    - self.fc3.out_features == 3
+    """
 
     fc1: nn.Linear
     fc2: nn.Linear
@@ -99,7 +110,19 @@ class OrderBookNet(nn.Module):
 
 
 class Trainer:
-    """Training loop, loss, optimiser, and checkpoint I/O for OrderBookNet."""
+    """Training loop, optimizer, and checkpoint I/O for ``OrderBookNet``.
+
+    Instance Attributes:
+    - model: the classifier being trained or evaluated
+    - optimizer: the Adam optimizer attached to the model parameters
+    - criterion: the training loss function
+    - device: the torch device on which training runs
+    - history: recorded training and validation losses by epoch
+
+    Representation Invariants:
+    - 'train_loss' in self.history
+    - 'val_loss' in self.history
+    """
 
     model: OrderBookNet
     optimizer: optim.Adam
@@ -216,7 +239,16 @@ class Trainer:
 
 @dataclass
 class _PortfolioState:
-    """Track the simulated overlay inventory and profit state."""
+    """Track the simulated overlay inventory and profit state.
+
+    Instance Attributes:
+    - balance: the running cash balance from simulated overlay trades
+    - position: the current signed inventory held by the overlay
+    - pnl_log: the time series of mark-to-market P&L values
+
+    Representation Invariants:
+    - len(self.pnl_log) >= 0
+    """
 
     balance: float = 0.0
     position: float = 0.0
@@ -225,7 +257,16 @@ class _PortfolioState:
 
 @dataclass
 class _FeatureState:
-    """Track feature normalization and one-step feature history for the agent."""
+    """Track feature normalization and one-step feature history for the agent.
+
+    Instance Attributes:
+    - mean: the stored feature means used for normalization, or None if absent
+    - std: the stored feature standard deviations used for normalization, or None if absent
+    - previous_base: the previous unaugmented base feature vector, or None if absent
+
+    Representation Invariants:
+    - self.mean is None or self.std is None or len(self.mean) == len(self.std)
+    """
 
     mean: np.ndarray | None = None
     std: np.ndarray | None = None
@@ -233,7 +274,19 @@ class _FeatureState:
 
 
 class Agent:
-    """Loads OrderBookNet in eval mode; maps snapshots to an action string."""
+    """Simulation-time classifier wrapper used for overlay inference.
+
+    Instance Attributes:
+    - model: the loaded neural-network classifier used for inference
+    - action_map: maps predicted class indices to action strings
+    - portfolio: the overlay portfolio state accumulated during simulation
+    - feature_state: the normalization statistics and one-step feature history
+    - model_loaded: whether a checkpoint was loaded successfully
+
+    Representation Invariants:
+    - set(self.action_map.keys()) == {0, 1, 2}
+    - set(self.action_map.values()) == {'buy', 'sell', 'hold'}
+    """
 
     model: OrderBookNet
     action_map: dict[int, str]

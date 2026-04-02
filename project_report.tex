@@ -8,7 +8,6 @@
 \usepackage{enumitem}
 \usepackage{amsmath}
 \usepackage{float}
-\usepackage{wrapfig}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 \setlist[itemize]{topsep=0.25em, itemsep=0.25em}
@@ -54,12 +53,19 @@ between the price shown on the screen and the mechanics operating underneath
 it. A market interface may display a stock at a certain level, but that does
 not mean an order can be filled there instantly or in unlimited size. In
 practice, fills depend on liquidity, queue position, and the slippage created
-when an order moves through the book.
+when an order moves through the book.\footnote{Gould et al.\ (2013) give a
+useful overview of price-time priority, queue position, and other core limit
+order-book mechanics:
+\url{https://arxiv.org/abs/1012.0349}}
 
 That gap between a quoted price and an executable price is one of the main
 ideas that motivated this project. It is also a very natural place to apply
 CSC111 ideas such as tree-based data structures, simulation, and algorithmic
-state updates. Quantyze studies that gap by simulating a limit order book in Python. We represent bids and asks as separate binary search trees of
+state updates. Quantyze studies that gap by simulating a limit order book in
+Python.\footnote{Cont and de Larrard (2013) model price dynamics directly from
+the evolving bid and ask queues, which matches our focus on how local book
+state and order flow jointly shape execution outcomes:
+\url{https://arxiv.org/abs/1104.4596}} We represent bids and asks as separate binary search trees of
 price levels, maintain FIFO priority within each level, replay event streams
 through a matching engine, and compute summary statistics about fills,
 cancellations, spread, midpoint, and slippage. On top of the simulator, we
@@ -73,11 +79,11 @@ as buy, sell, or hold from order-book state.}
 
 The project kept the same core direction as our proposal, but the final version
 organizes the submission around a browser display launched from
-\texttt{main.py}, with a terminal-menu fallback for the same simulator and
+\texttt{main.py}, with a terminal-menu option for the same simulator and
 training logic. That let us present the project in a PyCharm-friendly way without
-changing the main computational challenge: representing and updating a live
-order book efficiently with trees while connecting the simulator to a
-meaningful data and model-training pipeline. In the language of our original
+changing the main computational challenge, which was to represent and update a live
+order book efficiently with trees while connecting the simulator to
+meaningful data and model-training. In the language of our original
 proposal, we still see the project as an attempt to close the gap between what
 a trader sees on a chart and what actually has to happen for an order to be
 filled.
@@ -166,6 +172,11 @@ contains:
 After extraction, these files are expected to sit beside \texttt{main.py}. Both
 the browser UI and the terminal menu look for the packaged datasets and
 shipped baseline artifacts there.
+
+The two packaged internal CSVs, \texttt{sample\_internal.csv} and
+\texttt{huge\_internal.csv}, are local datasets prepared by our group in the
+project's canonical event format so the TA can run fast, reproducible
+retraining without extra preprocessing.
 
 The intended roles of these packaged files are:
 \begin{itemize}
@@ -424,19 +435,22 @@ split the orchestration code into \texttt{config.py}, \texttt{simulation.py},
 \texttt{terminal\_menu.py}, while keeping \texttt{main.py} as a small entry
 point.
 
-\begin{wrapfigure}{r}{0.52\textwidth}
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.50\textwidth]{ui_simulate_tab.png}
-\caption{Simulate tab: scenario selector, overlay mode, and replay controls.}
-\label{fig:ui-simulate}
-\end{wrapfigure}
-
-\begin{wrapfigure}{r}{0.52\textwidth}
-\centering
-\includegraphics[width=0.50\textwidth]{ui_charts_tab.png}
-\caption{Charts tab: order-book depth and execution-price history after a run.}
-\label{fig:ui-charts}
-\end{wrapfigure}
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{ui_simulate_tab.png}
+    \caption{Simulate tab: scenario selector, overlay mode, and replay controls.}
+    \label{fig:ui-simulate}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{ui_charts_tab.png}
+    \caption{Charts tab: order-book depth and execution-price history after a run.}
+    \label{fig:ui-charts}
+\end{minipage}
+\end{figure}
 
 \subsection*{3.5 Overall Computational Complexity}
 Quantyze demonstrates computational complexity in all three major ways
@@ -555,19 +569,22 @@ running \texttt{main.py} and opening the printed local URL:
     behavior.
 \end{enumerate}
 
-\begin{wrapfigure}{r}{0.52\textwidth}
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.50\textwidth]{ui_train_tab.png}
-\caption{Train tab: dataset selector, training progress, and live accuracy readout.}
-\label{fig:ui-train}
-\end{wrapfigure}
-
-\begin{wrapfigure}{r}{0.52\textwidth}
-\centering
-\includegraphics[width=0.50\textwidth]{ui_artifacts_tab.png}
-\caption{Artifacts tab: overlay status, saved checkpoint paths, and baseline vs.\ latest metrics.}
-\label{fig:ui-artifacts}
-\end{wrapfigure}
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{ui_train_tab.png}
+    \caption{Train tab: dataset selector, training progress, and live accuracy readout.}
+    \label{fig:ui-train}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{ui_artifacts_tab.png}
+    \caption{Artifacts tab: overlay status, saved checkpoint paths, and baseline vs.\ latest metrics.}
+    \label{fig:ui-artifacts}
+\end{minipage}
+\end{figure}
 
 \subsection*{4.5 How the TA Should Interpret the Output}
 The browser UI summaries and terminal menu contain the same two classes of
@@ -767,6 +784,10 @@ to make the hidden mechanics of a market feel concrete rather than abstract.
     D.\,J., \& Howison, S.\,D. (2013). Limit order books.
     \textit{Quantitative Finance}, 13(11), 1709--1742.
     Retrieved March 31, 2026, from \url{https://arxiv.org/abs/1012.0349}
+    \item Cont, R., \& de Larrard, A. (2013). Price dynamics in a Markovian
+    limit order market. \textit{SIAM Journal on Financial Mathematics}, 4(1),
+    1--25. Retrieved April 2, 2026, from
+    \url{https://arxiv.org/abs/1104.4596}
 \end{enumerate}
 
 \end{document}

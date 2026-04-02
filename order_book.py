@@ -25,11 +25,15 @@ from price_level import PriceLevel
 class OrderBook:
     """Full limit order book: bid BST, ask BST, order index, and trade log.
 
-    Attributes:
-        bids: BST of bid-side PriceLevels; best bid is the maximum price in the tree.
-        asks: BST of ask-side PriceLevels; best ask is the minimum price in the tree.
-        order_index: Maps order_id to Order for fast cancellation lookup.
-        trade_log: Running list of execution records; flushed to disk as log.json.
+    Instance Attributes:
+    - bids: the bid-side BST of price levels
+    - asks: the ask-side BST of price levels
+    - order_index: maps each live resting order_id to its Order object
+    - trade_log: the in-memory list of recorded trade dictionaries
+
+    Representation Invariants:
+    - self.bids.side == 'bid'
+    - self.asks.side == 'ask'
     """
 
     bids: BookTree

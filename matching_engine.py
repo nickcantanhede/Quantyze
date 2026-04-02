@@ -25,8 +25,7 @@ from price_level import PriceLevel
 
 @dataclass
 class MatchingEngine:
-    """
-    Process events against the live OrderBook
+    """Process events against the live order book.
 
     Instance Attributes:
     - book: the shared live order book used for matching

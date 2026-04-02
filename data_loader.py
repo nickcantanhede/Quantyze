@@ -32,7 +32,21 @@ from synthetic_scenarios import generate_synthetic_events
 
 @dataclass
 class ParsedLobsterRow:
-    """Parsed representation of one normalized raw LOBSTER message row."""
+    """Parsed representation of one normalized raw LOBSTER message row.
+
+    Instance Attributes:
+    - timestamp: the decoded event timestamp
+    - event_type: the raw LOBSTER event-type code
+    - order_id: the decoded order identifier
+    - size: the event quantity
+    - price_int: the integer price from the source row
+    - direction: the raw LOBSTER direction code
+    - resting_side: the inferred resting-order side, or None if not applicable
+
+    Representation Invariants:
+    - self.size >= 0
+    - self.direction in {-1, 1}
+    """
 
     timestamp: datetime
     event_type: int
@@ -44,7 +58,18 @@ class ParsedLobsterRow:
 
 
 class _LobsterCache:
-    """Store raw LOBSTER data and derived visualization annotations."""
+    """Cache raw LOBSTER rows and derived annotations.
+
+    Instance Attributes:
+    - raw_rows: the cached raw message rows
+    - raw_orderbook_rows: the cached raw order-book rows
+    - special_events: the cached non-replayable visualization annotations
+
+    Representation Invariants:
+    - len(self.raw_rows) >= 0
+    - len(self.raw_orderbook_rows) >= 0
+    - len(self.special_events) >= 0
+    """
 
     raw_rows: list[list[str]]
     raw_orderbook_rows: list[list[float]]
@@ -72,6 +97,10 @@ class DataLoader:
     - schema: the column names expected or found in the input CSV
     - source_format: one of {'internal', 'lobster', 'synthetic'}, or None if unset
     - lobster_cache: cached raw LOBSTER rows and visualization annotations
+
+    Representation Invariants:
+    - self.source_format in {None, 'internal', 'lobster', 'synthetic'}
+    - self.feature_dim == len(self.feature_names)
     """
 
     filepath: str | None
