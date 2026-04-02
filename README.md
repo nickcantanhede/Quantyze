@@ -7,9 +7,8 @@ the simulator, Quantyze includes a lightweight neural-network classifier that
 can be trained on order-book features and then used as an optional inference
 overlay during simulation.
 
-`main.py` is the single entry point for the final project. Running it with no
-arguments launches the browser UI, which is the primary TA-facing workflow.
-The terminal menu remains available as an explicit fallback through `--cli`.
+`main.py` is the single entry point for the final project. Running it in
+PyCharm, or running `python3 main.py`, launches the browser UI directly.
 
 ## Quickstart
 
@@ -44,21 +43,20 @@ Recommended grading path:
 The `huge_internal.csv` option and the packaged AAPL LOBSTER option are both
 large and can take noticeably longer to load and build training features.
 
-The browser UI is the primary way to experience the project. The terminal menu
-is still supported through `python3 main.py --cli` if the TA prefers that path
-or wants a fallback.
+The browser UI is the primary way to experience the project. A terminal-menu
+fallback still exists through `main(run_ui=False)`, but the intended TA path is
+the browser UI launched from `main.py`.
+
+The `Charts` tab loads `Chart.js` from a CDN, so browser chart rendering
+assumes a normal internet connection.
 
 To open the browser frontend:
 - run `main.py` in PyCharm, or run `python3 main.py`
 - open `http://127.0.0.1:9000` in a browser
 - use the `Simulate`, `Train`, `Artifacts`, and `Charts` tabs
 
-If port `9000` is already in use:
-- run `python3 main.py --ui --port 8080`
-- open `http://127.0.0.1:8080`
-
-To use the terminal menu instead:
-- run `python3 main.py --cli`
+If port `9000` is already in use, change the `port` argument in the final
+`main(...)` call inside `main.py` before running it again in PyCharm.
 
 ## Workflow Model
 
@@ -117,22 +115,26 @@ strategy.
 ## Top-Level Files
 
 The final submission tree is intentionally flat. The key files are:
-- `main.py`: entry point and top-level orchestration
-- `cli_menu.py`: interactive terminal menu
+- `main.py`: small entry point for the browser UI and terminal fallback
+- `terminal_menu.py`: interactive terminal menu
 - `data_loader.py`: internal CSV, synthetic scenario, and raw LOBSTER loading
 - `matching_engine.py`: price-time-priority matching logic
 - `order_book.py`, `book_tree.py`, `price_level.py`: tree-based order book
 - `neural_net.py`: model, training loop, and agent
-- `app.py`: compatibility wrapper that delegates the web UI to `main.py`
-- `server.py`: legacy post-simulation API helper kept for compatibility
+- `config.py`: shared constants, dataset presets, and overlay-state logic
+- `simulation.py`: simulation runtime helpers
+- `training.py`: classifier training and metrics generation
+- `api_payloads.py`: JSON serialization helpers for the browser API
+- `web.py`: Flask browser UI and API wiring
 - `index.html`, `ui.css`, `ui.js`: browser-side files for the web UI
 - `project_report.tex`
 - `project_report.pdf` in the final submission package
+- `submission_checklist.md`
 - `quantyze_datasets.zip`
 - `requirements.txt`
 - `active_model.json`
 
-## Useful Commands
+## Useful Entrypoints
 
 Install dependencies:
 
@@ -146,46 +148,14 @@ Run the browser UI:
 python3 main.py
 ```
 
-Run the browser UI explicitly:
-
-```bash
-python3 main.py --ui
-```
-
 Then open:
 
 ```text
 http://127.0.0.1:9000
 ```
 
-Run the terminal menu:
+Open the terminal menu from Python:
 
 ```bash
-python3 main.py --cli
-```
-
-Run the default simulation directly:
-
-```bash
-python3 main.py --no-ui
-```
-
-Train on an extracted packaged dataset directly:
-
-```bash
-python3 main.py --no-ui --train --data sample_internal.csv
-```
-
-```bash
-python3 main.py --no-ui --train --data huge_internal.csv
-```
-
-```bash
-python3 main.py --no-ui --train --data aapl_lobster_2012-06-21_message_5level_sample.csv
-```
-
-Train on a custom internal CSV or raw LOBSTER message CSV:
-
-```bash
-python3 main.py --no-ui --train --data <csv_path>
+python3 -c "import main; main.main(run_ui=False)"
 ```

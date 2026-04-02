@@ -23,6 +23,8 @@ htmlcov/
 # Extracted dataset package contents and runtime artifacts
 sample_internal.csv
 huge_internal.csv
+aapl_lobster_2012-06-21_message_5level_sample.csv
+aapl_lobster_2012-06-21_orderbook_5level_sample.csv
 instructions.txt
 model.pt
 training_metrics.json

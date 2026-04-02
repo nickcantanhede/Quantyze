@@ -7,6 +7,7 @@
 \usepackage{graphicx}
 \usepackage{enumitem}
 \usepackage{amsmath}
+\usepackage{float}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta, positioning, shapes.geometric}
 \setlist[itemize]{topsep=0.25em, itemsep=0.25em}
@@ -57,8 +58,7 @@ when an order moves through the book.
 That gap between a quoted price and an executable price is one of the main
 ideas that motivated this project. It is also a very natural place to apply
 CSC111 ideas such as tree-based data structures, simulation, and algorithmic
-state updates. Quantyze studies that gap by simulating a limit order book in
-pure Python. We represent bids and asks as separate binary search trees of
+state updates. Quantyze studies that gap by simulating a limit order book in Python. We represent bids and asks as separate binary search trees of
 price levels, maintain FIFO priority within each level, replay event streams
 through a matching engine, and compute summary statistics about fills,
 cancellations, spread, midpoint, and slippage. On top of the simulator, we
@@ -67,12 +67,12 @@ features and classifies market actions in the short term.
 
 \textbf{Our project goal is to build a tree-based market simulator that can
 replay realistic order flow, expose the mechanics of price-time-priority
-matching, and train a small neural network to classify short-horizon market
-actions as buy, sell, or hold from order-book state.}
+matching, and train a small neural network to classify short term market actions
+as buy, sell, or hold from order-book state.}
 
 The project kept the same core direction as our proposal, but the final version
-organizes the submission around a reliable browser-first workflow launched from
-\texttt{main.py}, with a terminal fallback for the same simulator and training
+organizes the submission around a browser display launched from
+\texttt{main.py}, with a terminal option for the same simulator and training
 logic. That let us present the project in a PyCharm-friendly way without
 changing the main computational challenge: representing and updating a live
 order book efficiently with trees while connecting the simulator to a
@@ -95,8 +95,9 @@ system much easier to follow:
 \end{itemize}
 
 The submission also includes a packaged dataset zip, so the TA does not need to
-download anything externally before running the project. That was important to
-us because we wanted the grading path to be self-contained and easy to repeat.
+download datasets or baseline model artifacts externally before running the
+project. That was important to us because we wanted the grading path to be
+packaged, local, and easy to repeat.
 
 \subsection*{2.1 Synthetic Event Data}
 We generated our own synthetic event streams for testing and demonstration.
@@ -110,8 +111,8 @@ These are created inside \texttt{data\_loader.py} and include three scenarios:
 These synthetic datasets use the same canonical event format as the rest of the
 project: \texttt{timestamp}, \texttt{order\_id}, \texttt{side},
 \texttt{order\_type}, \texttt{price}, and \texttt{quantity}. Their role is
-\textbf{simulation}, not packaged retraining. They are the fastest way for the
-TA to see fills, cancellations, spread changes, and book updates without
+\textbf{simulation only}. They are the fastest way to see fills, cancellations,
+spread changes, and book updates without
 waiting for a large dataset to load.
 
 \subsection*{2.2 LOBSTER Sample Data}
@@ -161,6 +162,10 @@ contains:
     \item \texttt{training\_metrics.json}
 \end{itemize}
 
+After extraction, these files are expected to sit beside \texttt{main.py}. Both
+the terminal and UI runs look
+for the packaged datasets and shipped baseline artifacts there.
+
 The intended roles of these packaged files are:
 \begin{itemize}
     \item \texttt{sample\_internal.csv}: the \textbf{quick} retraining check
@@ -172,13 +177,14 @@ The intended roles of these packaged files are:
     the paired order-book file required by the raw LOBSTER path
 \end{itemize}
 
-The packaged saved-state workflow also includes a shipped baseline checkpoint
-and metrics artifact, so the TA can use the model path without retraining
-first.
+The package also includes saved metrics and a baseline checkpoint, so the TA
+can use the model path without retraining first.
 
-Because this zip is under the course upload limit, we include
-\texttt{quantyze\_datasets.zip} directly in the final MarkUs submission rather
-than asking the TA to download it from an external service.
+The packaged datasets and baseline artifacts are local. The one browser-side
+runtime dependency that is still external is the \texttt{Chart.js} CDN used by
+the \texttt{Charts} tab, so viewing those browser charts assumes a normal
+internet connection even though the datasets and checkpoints are bundled with
+the submission.
 
 \section*{3. Computational Overview}
 \subsection*{3.1 Core Data Representation}
@@ -200,9 +206,53 @@ This logic is implemented across \texttt{book\_tree.py},
 
 The trees let us preserve sorted price structure while still supporting
 efficient best-bid and best-ask access. The FIFO queue inside each price level
-enforces time priority among orders resting at the same price. This combination
-directly models price-time-priority matching, which was the main algorithmic
-goal of our project.
+enforces time priority among orders resting at the same price. The queue is
+implemented as a doubly-linked list with a parallel \texttt{order\_id}-to-node
+dictionary, which gives O(1) cancellation by order id in addition to O(1)
+enqueue and dequeue. This combination directly models price-time-priority
+matching, which was the main algorithmic goal of our project.\footnote{Gould
+et al.\ (2013) provide a comprehensive treatment of price-time priority and
+order-book microstructure dynamics:
+\url{https://arxiv.org/abs/1012.0349}}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.55cm and 0.9cm,
+    every node/.style={font=\small},
+    level/.style={draw, rectangle, rounded corners=2pt,
+                  minimum width=1.7cm, minimum height=0.55cm,
+                  text centered},
+    bid/.style={level, fill=blue!15},
+    ask/.style={level, fill=red!12},
+    root/.style={level, fill=gray!20, minimum width=2.2cm},
+    queue/.style={draw, rectangle, minimum width=0.9cm,
+                  minimum height=0.42cm, font=\scriptsize, fill=yellow!25},
+    arr/.style={-{Stealth[length=4pt]}, thin},
+]
+\node[root] (ob) {OrderBook};
+\node[bid, below left=0.9cm and 2.0cm of ob]  (bid_root) {100.0 bid};
+\node[bid, below left=0.5cm and 0.7cm of bid_root]  (bid_l) {99.8 bid};
+\node[bid, below right=0.5cm and 0.7cm of bid_root] (bid_r) {99.5 bid};
+\node[ask, below right=0.9cm and 2.0cm of ob] (ask_root) {100.2 ask};
+\node[ask, below left=0.5cm and 0.7cm of ask_root]  (ask_l) {100.4 ask};
+\node[ask, below right=0.5cm and 0.7cm of ask_root] (ask_r) {100.6 ask};
+\draw[arr] (ob.south west) -- (bid_root.north);
+\draw[arr] (ob.south east) -- (ask_root.north);
+\draw[arr] (bid_root.south west) -- (bid_l.north);
+\draw[arr] (bid_root.south east) -- (bid_r.north);
+\draw[arr] (ask_root.south west) -- (ask_l.north);
+\draw[arr] (ask_root.south east) -- (ask_r.north);
+\node[above=0.05cm of bid_root, font=\scriptsize\itshape, text=blue!60] {best bid = max};
+\node[above=0.05cm of ask_root, font=\scriptsize\itshape, text=red!60]  {best ask = min};
+\end{tikzpicture}
+\caption{The \texttt{OrderBook} holds two \texttt{BookTree} instances. The bid
+tree's maximum-price node is the best bid; the ask tree's minimum-price node is
+the best ask. Each \texttt{PriceLevel} node holds a FIFO doubly-linked-list
+queue of resting orders that enforces
+time priority.}
+\label{fig:order-book}
+\end{figure}
 
 \subsection*{3.2 Event Replay and Matching}
 All incoming data is converted into a common \texttt{Event} representation in
@@ -219,7 +269,7 @@ handles limit orders, market orders, and cancellations. It updates the
 \texttt{OrderBook}, performs partial and full fills, removes empty price levels
 when necessary, and records execution information used for later metrics.
 
-At the end of a normal run, \texttt{main.py} prints a terminal summary with:
+At the end of a normal run, the simulation runtime reports:
 \begin{itemize}
     \item total filled quantity
     \item fill count
@@ -230,20 +280,70 @@ At the end of a normal run, \texttt{main.py} prints a terminal summary with:
     \item agent overlay mark-to-market P\&L if a trained checkpoint is active
 \end{itemize}
 
-The current default run path is command-line based rather than browser based.
-The project therefore reports results through terminal output, the packaged
-saved-state artifacts extracted from the dataset zip, and runtime logs such as:
+The same simulation and training state is surfaced in two ways:
+\begin{itemize}
+    \item the browser UI launched by \texttt{main.py}
+    \item the optional terminal fallback opened through
+    \texttt{main(run\_ui=False)}
+\end{itemize}
+
+The saved artifacts that support those workflows include:
 \begin{itemize}
     \item \texttt{model.pt}
     \item \texttt{training\_metrics.json}
+    \item \texttt{latest\_model.pt}
+    \item \texttt{latest\_training\_metrics.json}
+    \item \texttt{latest\_training\_data.csv}
+    \item \texttt{active\_model.json}
     \item \texttt{log.json}
 \end{itemize}
 
-\subsection*{3.3 Data Processing and Training Pipeline}
-The machine learning pipeline is built mainly in \texttt{data\_loader.py},
-\texttt{neural\_net.py}, and \texttt{main.py}.
+The packaged baseline artifacts are \texttt{model.pt} and
+\texttt{training\_metrics.json}. The remaining files are created or updated as
+the TA simulates, retrains, changes overlay mode, or inspects the latest
+execution log.
 
-The feature pipeline uses 12 features per example, extracted by
+\subsection*{3.3 Data Processing and Training Pipeline}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=0.45cm and 0.6cm,
+    box/.style={draw, rectangle, rounded corners=2pt,
+                minimum width=2.3cm, minimum height=0.58cm,
+                text centered, font=\small, fill=gray!10},
+    arr/.style={-{Stealth[length=4pt]}, thin},
+    lab/.style={font=\scriptsize\itshape, text=gray!80},
+]
+\node[box] (events)  {Event Stream};
+\node[box, right=1.1cm of events]  (engine) {Matching Engine};
+\node[box, right=1.1cm of engine]  (book)   {OrderBook};
+\node[box, below=0.8cm of book]    (feat)   {12 base features};
+\node[box, below=0.5cm of feat]    (aug)    {+4 delta features};
+\node[box, below=0.5cm of aug]     (label)  {horizon label};
+\node[box, left=1.1cm of label]    (net)    {OrderBookNet};
+\node[box, left=1.1cm of net]      (ckpt)   {checkpoint (.pt)};
+\draw[arr] (events)  -- node[above, lab]{replay} (engine);
+\draw[arr] (engine)  -- node[above, lab]{updates} (book);
+\draw[arr] (book)    -- node[right, lab]{\texttt{depth\_snapshot()}} (feat);
+\draw[arr] (feat)    -- (aug);
+\draw[arr] (aug)     -- (label);
+\draw[arr] (label)   -- node[below, lab]{loss} (net);
+\draw[arr] (net)     -- node[below, lab]{\texttt{save()}} (ckpt);
+\end{tikzpicture}
+\caption{This is how the training data flows: events are replayed through the matching engine to
+keep the \texttt{OrderBook} live. At each step, a 16-D feature vector (12
+instantaneous book-state features plus 4 one-step deltas) and a horizon-based
+label are extracted. \texttt{OrderBookNet} is trained with class-weighted
+cross-entropy and the best-validation-loss state is saved as a checkpoint.}
+\label{fig:pipeline}
+\end{figure}
+
+The machine learning pipeline is built mainly in \texttt{data\_loader.py},
+\texttt{neural\_net.py}, and \texttt{training.py}.
+
+The feature pipeline uses 16 features per example. The first 12 are instantaneous
+book-state features extracted by
 \texttt{DataLoader.\_feature\_vector\_from\_levels}:
 \begin{enumerate}
     \item best bid price
@@ -260,28 +360,30 @@ The feature pipeline uses 12 features per example, extracted by
     \item event-side feature
 \end{enumerate}
 
-The label policy is a \textbf{next-changed-mid rule}, implemented in
-\texttt{DataLoader.\_labels\_from\_mid\_sequence}. For each example, we scan
-forward through the mid-price sequence until the midpoint changes by a
-non-zero amount:
+The remaining 4 are one-step history-delta features appended by
+\texttt{DataLoader.augment\_feature\_vector}:
+\begin{enumerate}
+    \setcounter{enumi}{12}
+    \item one-step best bid delta
+    \item one-step best ask delta
+    \item one-step mid-price delta
+    \item one-step imbalance delta
+\end{enumerate}
+
+The label policy is \textbf{horizon-based}. For each example, we compare
+the current midpoint to the midpoint 50 events later:
 \begin{itemize}
-    \item if the next observed change is an increase, the label is
-    \texttt{buy}
-    \item if the next observed change is a decrease, the label is
+    \item if the future midpoint is higher by more than the threshold, the
+    label is \texttt{buy}
+    \item if it is lower by more than the threshold, the label is
     \texttt{sell}
-    \item if no change is observed within the remaining sequence, the label
-    is \texttt{hold}
+    \item otherwise the label is \texttt{hold}
 \end{itemize}
 
-This rule labels each snapshot with the direction of the very next midpoint
-move, rather than comparing against a fixed future horizon. It avoids an
-arbitrary look-ahead window and produces a label that is directly tied to
-the next price-relevant event in the replay.
-
 This pipeline is implemented in \texttt{DataLoader.build\_training\_dataset} and
-related helper methods. The final training flow in \texttt{main.py} computes
-train/validation splits, standardizes features with training-set mean and
-standard deviation, applies class-weighted cross-entropy, trains a PyTorch
+related helper methods. The final training flow in \texttt{training.py}
+computes train/validation splits, standardizes features with training-set mean
+and standard deviation, applies class-weighted cross-entropy, trains a PyTorch
 feed-forward network, and saves the latest training artifacts:
 \begin{itemize}
     \item \texttt{latest\_model.pt}
@@ -294,28 +396,51 @@ The shipped baseline saved-state artifacts remain \texttt{model.pt} and
 checkpoint.
 
 \subsection*{3.4 User Interactivity}
-The TA-facing interface is a nested terminal menu implemented in
-\texttt{cli\_menu.py}. Running \texttt{main.py} with no arguments opens a menu
-with separate sections for:
+The TA-facing interface is a browser UI launched by \texttt{main.py} and
+served by \texttt{web.py}. Running \texttt{main.py} in PyCharm, or running
+\texttt{python3 main.py}, starts the browser workflow at
+\texttt{http://127.0.0.1:9000}. The browser UI has four tabs:
 \begin{itemize}
-    \item quick TA demo
-    \item simulation
-    \item training
-    \item artifacts and metrics
-    \item help / command reference
+    \item \texttt{Simulate}
+    \item \texttt{Train}
+    \item \texttt{Artifacts}
+    \item \texttt{Charts}
 \end{itemize}
 
-The quick TA demo is the recommended first path because it prints the current
-overlay status, runs the default \texttt{balanced} scenario, and explains how
-to interpret the resulting metrics. The rest of the menu lets the TA choose
-scenarios, replay datasets, run short training, inspect baseline versus latest
-metrics, inspect artifact status, inspect the current execution log, inspect
-the packaged dataset zip, and switch the simulation overlay between the shipped
-baseline checkpoint, the latest retrained checkpoint, and no model. The active
-choice is stored in
-\texttt{active\_model.json}, which makes the training-to-simulation workflow
-persistent across runs. In the final submission, the browser UI and the
-terminal fallback share the same runtime entry point in \texttt{main.py}.
+Those tabs expose the same underlying simulator and training pipeline from
+different angles. \texttt{Simulate} chooses a synthetic scenario or CSV replay,
+controls replay speed, and selects the overlay mode. \texttt{Train} runs the
+packaged internal datasets, the packaged LOBSTER message-file path, or a custom
+CSV path. \texttt{Artifacts} reports the active overlay state, saved
+checkpoints, metrics files, and latest training outputs. \texttt{Charts}
+renders order-book depth and execution-price history after a simulation.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{ui_simulate_tab.png}
+\caption{The \texttt{Simulate} tab of the Quantyze browser UI
+(\texttt{http://127.0.0.1:9000}). The TA selects a synthetic scenario or CSV
+dataset, sets replay speed, and chooses the active model overlay before
+running the simulation.}
+\label{fig:ui-simulate}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{ui_charts_tab.png}
+\caption{The \texttt{Charts} tab after a simulation. The left panel shows the
+current order-book depth as a horizontal bar chart (bids in green, asks in
+red). The right panel plots execution prices over fill index, coloured by
+side. The table below lists the 50 most recent fills with timestamp, side,
+price, quantity, and maker order id.}
+\label{fig:ui-charts}
+\end{figure}
+
+The active overlay choice is stored in \texttt{active\_model.json}, which
+makes the browser workflow persistent across runs. For submission readiness, we
+split the orchestration code into \texttt{config.py}, \texttt{simulation.py},
+\texttt{training.py}, \texttt{api\_payloads.py}, and \texttt{web.py}, while
+keeping \texttt{main.py} as a small entry point.
 
 \subsection*{3.5 Overall Computational Complexity}
 Quantyze demonstrates computational complexity in all three major ways
@@ -332,15 +457,15 @@ highlighted by the project rubric.
     cancellation/indexing logic are all custom project code rather than thin
     wrappers around third-party libraries.
     \item \textbf{Non-trivial reporting and interactivity:} the browser UI,
-    terminal fallback, saved-state workflow, metrics inspection, and
+    terminal run, saved-state workflow, metrics inspection, and
     execution-log reporting make the program substantially more interactive
     than a single fixed command.
 \end{itemize}
 
 \section*{4. Instructions for Obtaining Datasets and Running the Program}
-The TA-facing run path is organized as a workflow rather than a list of
-independent commands. The most important distinction is that
-\textbf{simulation source} and \textbf{model source} are separate:
+The TA-facing run path is a single browser-first workflow. The most important
+distinction is that \textbf{simulation source} and \textbf{model source} are
+separate:
 \begin{itemize}
     \item the \textbf{simulation source} is the event stream being replayed,
     such as \texttt{balanced}, \texttt{low\_liquidity},
@@ -361,40 +486,59 @@ program.
 
 \subsection*{4.2 Obtaining Datasets}
 The TA downloads \texttt{quantyze\_datasets.zip} from our final MarkUs
-submission and extracts it beside \texttt{main.py}. This provides:
+submission and extracts it beside \texttt{main.py}. After extraction, the
+project should see:
 \begin{itemize}
-    \item a small internal CSV for a quick retraining check
-    \item a larger internal CSV for a slower baseline-scale retraining demo
-    \item a packaged Apple LOBSTER \textbf{message file} and its paired
-    \textbf{order-book file}
-    \item the baseline checkpoint and metrics artifacts
+    \item \texttt{sample\_internal.csv}
+    \item \texttt{huge\_internal.csv}
+    \item \texttt{aapl\_lobster\_2012-06-21\_message\_5level\_sample.csv}
+    \item \texttt{aapl\_lobster\_2012-06-21\_orderbook\_5level\_sample.csv}
+    \item \texttt{instructions.txt}
+    \item \texttt{model.pt}
+    \item \texttt{training\_metrics.json}
 \end{itemize}
 
 The shortest TA path should start with \texttt{sample\_internal.csv}. The
 larger internal dataset and the packaged LOBSTER pair are both slower-loading
 options for a more thorough optional check.
 
-\subsection*{4.3 Workflow Overview}
-The primary grading path is the browser UI launched by running
-\texttt{main.py}. At each stage, it makes four things explicit:
+As the TA trains or changes overlay state, the runtime may also create or
+update:
 \begin{itemize}
-    \item What event source is being replayed?
-    \item Which checkpoint, if any, is active?
-    \item Where did that checkpoint come from?
-    \item What is the next logical action: inspect, train, or simulate?
+    \item \texttt{latest\_model.pt}
+    \item \texttt{latest\_training\_metrics.json}
+    \item \texttt{latest\_training\_data.csv}
+    \item \texttt{active\_model.json}
+    \item \texttt{log.json}
 \end{itemize}
 
-The intended workflow starts with the default browser run, then branches into
-optional extra simulations, classifier retraining, or fallback terminal use
-through \texttt{main.py --cli}.
+\subsection*{4.3 Workflow Overview}
+The primary grading path is:
+\begin{enumerate}
+    \item extract \texttt{quantyze\_datasets.zip} beside \texttt{main.py}
+    \item open the project in PyCharm
+    \item run \texttt{main.py}
+    \item open \texttt{http://127.0.0.1:9000}
+    \item use the \texttt{Simulate}, \texttt{Train}, \texttt{Artifacts}, and
+    \texttt{Charts} tabs
+\end{enumerate}
+
+This path makes four things explicit at all times:
+\begin{itemize}
+    \item what event source is being replayed
+    \item which checkpoint, if any, is active
+    \item where that checkpoint came from
+    \item what to do next: simulate, train, or inspect artifacts
+\end{itemize}
+
+The packaged datasets and baseline artifacts are local, but the browser
+\texttt{Charts} tab loads \texttt{Chart.js} from a standard CDN. That means
+browser chart rendering assumes a normal internet connection even though the
+submission data and checkpoint files are bundled locally.
 
 \subsection*{4.4 Recommended TA Demo}
-The clearest way to understand the project is the following walkthrough.
-
-Open the project in PyCharm, run \texttt{main.py} with no additional
-arguments, and open the printed local URL in a browser.
-
-We recommend the following sequence:
+The clearest way to understand the project is the following walkthrough after
+running \texttt{main.py} and opening the printed local URL:
 \begin{enumerate}
     \item Start on the \texttt{Simulate} tab and run the default
     \texttt{balanced} scenario. This is the fastest simulator-first path and
@@ -412,20 +556,36 @@ We recommend the following sequence:
     the UI writes the latest output files and exposes the new checkpoint in the
     saved artifact status.
     \item Open \texttt{Artifacts}. Check the overlay status, saved files, and
-    baseline versus latest metrics. The provenance should now point to the
-    newly trained checkpoint rather than the shipped baseline if the latest
-    model has been activated.
+    baseline versus latest metrics.
     \item Open \texttt{Charts} after a simulation. This shows order-book depth
     and execution-price history based on the replay that just ran.
-    \item Re-run the \texttt{balanced} synthetic demo under a different
-    overlay. This uses the same event
-    stream as before, but under a different overlay. It helps isolate the
+    \item Re-run \texttt{balanced} under a different overlay to isolate the
     difference between \textit{market replay} and \textit{agent overlay}
     behavior.
 \end{enumerate}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{ui_train_tab.png}
+\caption{The \texttt{Train} tab. The TA selects a training dataset
+(\texttt{sample\_internal.csv}, \texttt{huge\_internal.csv}, the packaged
+LOBSTER pair, or a custom CSV path), then clicks \textbf{Start Training}.
+The panel summarises the pipeline configuration before the run begins.}
+\label{fig:ui-train}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.82\textwidth]{ui_artifacts_tab.png}
+\caption{The \texttt{Artifacts} tab. It shows the active model overlay mode
+and provenance, the file status of all saved checkpoints and metrics
+artifacts, the baseline and latest training metrics side by side, and a
+preview of the most recent execution log records.}
+\label{fig:ui-artifacts}
+\end{figure}
+
 \subsection*{4.5 How the TA Should Interpret the Output}
-The browser UI and direct terminal output contain the same two classes of
+The browser UI summaries and terminal fallback contain the same two classes of
 information, and keeping them separate is the key to understanding Quantyze.
 
 \subsubsection*{Simulation Run Configuration}
@@ -468,8 +628,9 @@ If an active checkpoint is loaded, the program also prints
 carefully.
 
 It is \textbf{not} a claim that the model is a profitable trading strategy. In
-the current system, the neural network is trained to classify the direction of the next
-non-zero midpoint change: buy, sell, or hold. During
+the current system, the neural network is trained from the midpoint move
+50 events ahead and maps each step to \texttt{buy}, \texttt{sell}, or
+\texttt{hold}. During
 simulation, that prediction is converted into a simple paper-trading overlay
 that increments or decrements inventory by one unit whenever the simulator
 observes fills. As a result:
@@ -488,11 +649,12 @@ inventory and a negative mark-to-market value even when the matching engine
 itself is behaving correctly.
 
 \subsubsection*{Training Metrics}
-The training menu prints validation accuracy, majority-class baseline,
-per-class recall, and the confusion matrix. These values measure how well the
-classifier reproduces the label rule derived from future midpoint movement.
-They do not directly measure whether the simulated agent will earn positive
-P\&L on every synthetic scenario.
+The \texttt{Train} tab and the terminal fallback report validation accuracy,
+majority-class baseline, per-class recall, and the confusion matrix. These
+values measure how
+well the classifier reproduces the label rule derived from future midpoint
+movement. They do not directly measure whether the simulated agent will earn
+positive P\&L on every synthetic scenario.
 
 \subsection*{4.6 Optional Raw LOBSTER Check}
 If the TA wants to test the raw LOBSTER path, they do \textbf{not} need to
@@ -507,36 +669,26 @@ infers the paired order-book path by replacing \texttt{\_message\_} with
 \texttt{\_orderbook\_}.
 
 \section*{5. Changes from Proposal to Final Submission}
-Several parts of the final project changed in useful ways from the proposal.
+The final project is cleaner and narrower than the proposal. The simulator
+remained the core deliverable, and the ML component stayed as an optional
+overlay rather than becoming the center of the project.
 
-The simulator core became stronger and more concrete. The final system has a
-clearer separation between loading data, replaying events, matching orders,
-computing summaries, and handling both the browser UI and the terminal
-fallback. The BST-based order
-book and FIFO price-level logic were central from the beginning, but the final
-project makes their interaction much clearer.
+On the implementation side, we ended with a clearer module split than we
+originally imagined: \texttt{config.py} holds shared constants and overlay
+state, \texttt{simulation.py} owns replay orchestration, \texttt{training.py}
+owns classifier training, \texttt{web.py} serves the browser UI, and
+\texttt{main.py} is now a small entry point.
 
-The machine learning plan also became more specific. In the proposal, we left
-room for either a decision-tree or neural-network predictor. In the final
-submission, we committed to a PyTorch neural network and built a full training
-pipeline with explicit features, normalization, class weighting, saved
-checkpoints, and validation metrics. In other words, the ML side became less
-open-ended and more concrete.
+Our frontend plan also changed. The proposal left room for a heavier
+React/Plotly-style interface, but the final submission uses a lightweight
+Flask/browser UI instead. That choice kept the focus on the tree-based order
+book, matching engine, and training pipeline while still giving the TA a clear
+PyCharm-friendly workflow.
 
-Our display plan also became more realistic. The proposal emphasized a more
-ambitious React/Plotly-style interface, but the final submission focuses on a
-lighter browser UI launched directly from \texttt{main.py} and backed by the
-same Python simulator and training code as the CLI fallback. We chose to
-prioritize a robust tree-based simulator and a reproducible training workflow
-over a more ambitious frontend stack. That was a practical choice, not a
-change in what we thought the project was about.
-
-The data plan also became more realistic. Instead of treating external data in
-the abstract, the final project clearly separates synthetic scenarios for
-replay, packaged internal CSVs for fast retraining, and a packaged raw LOBSTER
-pair for the real-data preprocessing path. That keeps the TA workflow
-self-contained while still showing that the project can process real market
-data.
+The data plan became more concrete as well. Instead of treating external data
+abstractly, the final submission cleanly separates synthetic replay scenarios,
+packaged internal CSVs for fast retraining, and one packaged raw LOBSTER pair
+for the real-data preprocessing path.
 
 \section*{6. Discussion}
 Our goal was to model the mechanics of a limit order book using trees and to
@@ -545,9 +697,9 @@ does meet that goal, though the machine learning side is more modest than the
 simulator itself.
 
 On the simulation side, the output is meaningful and easy to interpret. In the
-current default \texttt{balanced} run, the simulator reports 1748.0 total
-filled volume, 374 fills, 128 cancellations, a final spread of approximately
-0.6, and a final midpoint of 100.0. Those values show that the event sequence
+current default \texttt{balanced} run, the simulator reports 1748.00 total
+filled volume, 374 fills, 128 cancellations, a final spread of 0.60, and a
+final midpoint of 100.00. Those values show that the event sequence
 is not just inserting passive orders forever; it is generating executions,
 consuming liquidity, and rebuilding the book over time. That mattered to us
 from the beginning, because one of the main motivations for the project was to
@@ -562,12 +714,12 @@ tree-based design naturally. That gives the project real computational
 substance beyond simple data loading or basic statistics.
 
 The machine learning component works, but it needs to be interpreted carefully.
-The packaged baseline checkpoint and its accompanying metrics artifact show a
-validation accuracy of approximately 0.99992 compared to a majority-class
-baseline of approximately 0.33753. Those numbers are useful for showing that
-the training pipeline, checkpoint loader, and saved-state workflow function
-correctly, but they should not be read as a realistic claim about
-real-market prediction.
+The packaged baseline checkpoint and its accompanying metrics artifact now show
+a validation accuracy of approximately 0.81644 compared to a majority-class
+baseline of approximately 0.66184 on \texttt{huge\_internal.csv}. These values
+are useful for confirming that the training pipeline, checkpoint loader, and
+saved-state workflow function correctly, but they are still tied to a packaged
+internal dataset rather than a difficult real-market benchmark.
 
 The run-time P\&L shown in the simulator should also be read as an agent
 overlay metric rather than as proof of profitability. The neural network is
@@ -580,7 +732,7 @@ scenario.
 When we tested on public LOBSTER sample data during development, the task was
 much harder and performance was only modestly above a naive baseline. For that
 reason, we do not present the current model as a strong predictive system for
-real markets. In this project, its role is better understood as a small 
+real markets. In this project, its role is better understood as a small
 proof of concept that connects book-state features to model output inside a
 complete simulator.
 
@@ -589,8 +741,7 @@ just to maximize predictive accuracy. It was to build a full computational
 pipeline from market events to order-book state to derived features to model
 output. In that sense, the ML side is successful: it uses both synthetic and
 real-data paths, produces saved checkpoints, supports inference inside the
-simulator, and can be retrained from the browser UI, the command line, or the
-terminal fallback menu.
+simulator, and can be retrained from the browser UI or the terminal fallback.
 
 We also ran into clear limitations. Synthetic data is easy to test and reason
 about, but it is not enough to justify a strong predictive claim. Real LOBSTER
@@ -625,9 +776,10 @@ to make the hidden mechanics of a market feel concrete rather than abstract.
     \url{https://www.investopedia.com/terms/d/depth-of-market.asp}
     \item QuestDB. (n.d.). \textit{Limit order book}. Retrieved March 31, 2026,
     from \url{https://questdb.com/glossary/limit-order-book/}
-    \item University of Oxford. (2019). \textit{Introduction to limit order book
-    markets}. Retrieved March 31, 2026, from
-    \url{https://www.maths.ox.ac.uk/system/files/attachments/NUS-LOB19.pdf}
+    \item Gould, M.\,D., Porter, M.\,A., Williams, S., McDonald, M., Fenn,
+    D.\,J., \& Howison, S.\,D. (2013). Limit order books.
+    \textit{Quantitative Finance}, 13(11), 1709--1742.
+    Retrieved March 31, 2026, from \url{https://arxiv.org/abs/1012.0349}
 \end{enumerate}
 
 \end{document}
