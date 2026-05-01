@@ -24,10 +24,10 @@ from datetime import date, datetime, timedelta
 
 import numpy as np
 
-from matching_engine import MatchingEngine
-from order_book import OrderBook
-from orders import Event
-from synthetic_scenarios import generate_synthetic_events
+from core.matching_engine import MatchingEngine
+from core.order_book import OrderBook
+from core.orders import Event
+from data.synthetic_scenarios import generate_synthetic_events
 
 
 @dataclass
@@ -858,7 +858,7 @@ if __name__ == '__main__':
     python_ta.check_all(config={
         'extra-imports': [
             'csv', 'os', 're', 'dataclasses', 'datetime', 'numpy',
-            'matching_engine', 'order_book', 'orders', 'synthetic_scenarios',
+            'core.matching_engine', 'core.order_book', 'core.orders', 'data.synthetic_scenarios',
             'doctest', 'python_ta'
         ],
         'allowed-io': [

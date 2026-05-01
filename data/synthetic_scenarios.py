@@ -20,9 +20,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 
-from matching_engine import MatchingEngine
-from order_book import OrderBook
-from orders import Event
+from core.matching_engine import MatchingEngine
+from core.order_book import OrderBook
+from core.orders import Event
 
 SYNTHETIC_START_TIME = datetime(2026, 1, 1, 9, 30, 0)
 _BALANCED_SEED_ORDERS = (
@@ -352,8 +352,8 @@ if __name__ == '__main__':
 
     python_ta.check_all(config={
         'extra-imports': [
-            'dataclasses', 'datetime', 'matching_engine', 'order_book',
-            'orders', 'doctest', 'python_ta'
+            'dataclasses', 'datetime', 'core.matching_engine', 'core.order_book',
+            'core.orders', 'doctest', 'python_ta'
         ],
         'allowed-io': [],
         'max-line-length': 120

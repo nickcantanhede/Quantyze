@@ -17,9 +17,9 @@ Sahand Samadirand
 
 import json
 
-from book_tree import BookTree
-from orders import Order
-from price_level import PriceLevel
+from core.book_tree import BookTree
+from core.orders import Order
+from core.price_level import PriceLevel
 
 
 class OrderBook:
@@ -58,7 +58,7 @@ class OrderBook:
         """Insert the order into the bid or ask BST at its limit price and register it in order_index.
 
         >>> from datetime import datetime
-        >>> from orders import Event
+        >>> from core.orders import Event
         >>> book = OrderBook()
         >>> book.add_limit_order(
         ...     Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.5, 3.0))
@@ -94,7 +94,7 @@ class OrderBook:
         cancellation succeeded.
 
         >>> from datetime import datetime
-        >>> from orders import Event
+        >>> from core.orders import Event
         >>> book = OrderBook()
         >>> book.add_limit_order(
         ...     Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.5, 3.0))
@@ -176,7 +176,7 @@ class OrderBook:
         ``(price, volume)`` tuples suitable for charts and API responses.
 
         >>> from datetime import datetime
-        >>> from orders import Event
+        >>> from core.orders import Event
         >>> book = OrderBook()
         >>> book.add_limit_order(
         ...     Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.0, 1.0))
@@ -223,7 +223,7 @@ if __name__ == '__main__':
     doctest.testmod()
 
     python_ta.check_all(config={
-        'extra-imports': ['book_tree', 'orders', 'price_level', 'json', 'doctest', 'python_ta'],
+        'extra-imports': ['core.book_tree', 'core.orders', 'core.price_level', 'json', 'doctest', 'python_ta'],
         'allowed-io': ['flush_log'],
         'disable': ['E9998'],
         'max-line-length': 120

@@ -18,7 +18,7 @@ import csv
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from orders import Event
+from core.orders import Event
 
 SAMPLE_DATASET_PATH = "sample_internal.csv"
 HUGE_DATASET_PATH = "huge_internal.csv"
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     print(f"Wrote {huge_count} events to {Path(HUGE_DATASET_PATH).resolve()}")
 
     python_ta.check_all(config={
-        "extra-imports": ["csv", "datetime", "pathlib", "orders", "doctest", "python_ta"],
+        "extra-imports": ["csv", "datetime", "pathlib", "core.orders", "doctest", "python_ta"],
         "allowed-io": ["write_events_csv", "main"],
         "max-line-length": 100
     })

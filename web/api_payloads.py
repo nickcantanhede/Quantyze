@@ -19,10 +19,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from matching_engine import MatchingEngine
-from neural_net import Agent
-from order_book import OrderBook
-from price_level import PriceLevel
+from core.matching_engine import MatchingEngine
+from ml.neural_net import Agent
+from core.order_book import OrderBook
+from core.price_level import PriceLevel
 
 
 def price_level_top(level: PriceLevel | None) -> dict[str, float] | None:
@@ -47,7 +47,7 @@ def book_summary_payload(book: OrderBook, agent: Agent | None) -> dict[str, Any]
     """Return the payload used by ``GET /api/book/summary``.
 
     >>> from datetime import datetime
-    >>> from orders import Event, Order
+    >>> from core.orders import Event, Order
     >>> order_book = OrderBook()
     >>> order_book.add_limit_order(Order(Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.5, 1.0)))
     >>> order_book.add_limit_order(Order(Event(datetime(2026, 1, 1, 9, 30, 1), 's1', 'sell', 'limit', 100.5, 1.0)))
@@ -151,8 +151,8 @@ if __name__ == '__main__':
 
     python_ta.check_all(config={
         'extra-imports': [
-            'json', 'pathlib', 'typing', 'matching_engine',
-            'neural_net', 'order_book', 'price_level', 'doctest', 'python_ta'
+            'json', 'pathlib', 'typing', 'core.matching_engine',
+            'ml.neural_net', 'core.order_book', 'core.price_level', 'doctest', 'python_ta'
         ],
         'allowed-io': ['_load_trade_records'],
         'max-line-length': 120

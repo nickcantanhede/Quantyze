@@ -25,8 +25,8 @@ from pathlib import Path
 import torch
 from torch.utils.data import DataLoader as TorchDataLoader, TensorDataset
 
-from data_loader import DataLoader
-from neural_net import OrderBookNet, Trainer
+from data.data_loader import DataLoader
+from ml.neural_net import OrderBookNet, Trainer
 from config import (
     CLASS_NAMES,
     LATEST_MODEL_PATH,
@@ -447,7 +447,7 @@ if __name__ == '__main__':
     python_ta.check_all(config={
         'extra-imports': [
             'csv', 'hashlib', 'json', 'dataclasses', 'pathlib', 'typing',
-            'torch', 'torch.utils.data', 'data_loader', 'neural_net',
+            'torch', 'torch.utils.data', 'data.data_loader', 'ml.neural_net',
             'config', 'doctest', 'python_ta'
         ],
         'allowed-io': ['_export_training_csv', 'train_model'],

@@ -21,7 +21,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from data_loader import DataLoader
+from data.data_loader import DataLoader
 
 CLASS_NAMES = ["buy", "sell", "hold"]
 MODEL_PATH = "model.pt"
@@ -446,7 +446,7 @@ if __name__ == '__main__':
     python_ta.check_all(config={
         'extra-imports': [
             'hashlib', 'json', 'os', 'pathlib', 'typing',
-            'data_loader', 'doctest', 'python_ta'
+            'data.data_loader', 'doctest', 'python_ta'
         ],
         'allowed-io': [
             'sha256_file',

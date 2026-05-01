@@ -20,7 +20,7 @@ Sahand Samadirand
 
 from dataclasses import dataclass
 
-from price_level import PriceLevel
+from core.price_level import PriceLevel
 
 
 @dataclass()
@@ -280,7 +280,7 @@ if __name__ == '__main__':
     doctest.testmod()
 
     python_ta.check_all(config={
-        'extra-imports': ['price_level', 'dataclasses', 'doctest', 'python_ta'],
+        'extra-imports': ['core.price_level', 'dataclasses', 'doctest', 'python_ta'],
         'allowed-io': [],
         'max-line-length': 120
     })

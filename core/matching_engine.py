@@ -18,9 +18,9 @@ Sahand Samadirand
 from __future__ import annotations
 from dataclasses import dataclass
 
-from order_book import OrderBook
-from orders import Event, IncomingOrder, Order
-from price_level import PriceLevel
+from core.order_book import OrderBook
+from core.orders import Event, IncomingOrder, Order
+from core.price_level import PriceLevel
 
 
 @dataclass
@@ -307,7 +307,7 @@ if __name__ == '__main__':
     doctest.testmod()
 
     python_ta.check_all(config={
-        'extra-imports': ['dataclasses', 'order_book', 'orders', 'price_level', 'doctest', 'python_ta'],
+        'extra-imports': ['dataclasses', 'core.order_book', 'core.orders', 'core.price_level', 'doctest', 'python_ta'],
         'allowed-io': [],
         'max-line-length': 120
     })

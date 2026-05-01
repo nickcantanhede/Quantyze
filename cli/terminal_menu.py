@@ -20,7 +20,7 @@ import zipfile
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from simulation import RunArgs, make_run_args
+from runtime.simulation import RunArgs, make_run_args
 
 DATASET_PACKAGE_PATH = "quantyze_datasets.zip"
 
@@ -870,7 +870,7 @@ if __name__ == '__main__':
 
     python_ta.check_all(config={
         'extra-imports': [
-            'json', 'os', 'zipfile', 'collections.abc', 'dataclasses', 'simulation',
+            'json', 'os', 'zipfile', 'collections.abc', 'dataclasses', 'runtime.simulation',
             'doctest', 'python_ta'
         ],
         'disable': ['E9998'],

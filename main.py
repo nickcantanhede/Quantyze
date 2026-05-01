@@ -14,7 +14,7 @@ Sahand Samadirand
 
 from __future__ import annotations
 
-from terminal_menu import (
+from cli.terminal_menu import (
     MenuCallbacks,
     MenuConfig,
     MenuDatasets,
@@ -36,9 +36,9 @@ from config import (
     resolve_active_model_status,
     set_active_model_selection,
 )
-from simulation import run_simulation_from_config
-from training import train_model
-from web import run_browser_ui
+from runtime.simulation import run_simulation_from_config
+from ml.training import train_model
+from web.app import run_browser_ui
 
 
 def _build_menu_config() -> MenuConfig:

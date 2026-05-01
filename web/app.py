@@ -25,7 +25,7 @@ from typing import Any, TextIO, cast
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from api_payloads import (
+from web.api_payloads import (
     book_depth_payload,
     book_summary_payload,
     clamp_int,
@@ -54,13 +54,13 @@ from config import (
     training_preset_map,
     ui_config_payload,
 )
-from simulation import (
+from runtime.simulation import (
     build_system,
     make_run_args,
     print_summary,
     simulation_source_label,
 )
-from training import train_model
+from ml.training import train_model
 
 
 class _SimulationState:
@@ -339,7 +339,12 @@ def _run_web_training(
 
 def create_web_app() -> Flask:
     """Build the browser-based Quantyze web application."""
-    app = Flask(__name__, static_folder=".", static_url_path="")
+    app = Flask(
+        __name__,
+        static_folder="static",
+        static_url_path="",
+        template_folder="templates",
+    )
     web_lock = threading.Lock()
     web_sim = _SimulationState()
     web_train = _TrainingState()
@@ -354,7 +359,7 @@ def create_web_app() -> Flask:
 
     @app.get("/")
     def index() -> Any:
-        return send_from_directory(".", "index.html")
+        return send_from_directory("templates", "index.html")
 
     @app.get("/api/health")
     def health() -> Any:
@@ -605,7 +610,7 @@ if __name__ == '__main__':
     python_ta.check_all(config={
         'extra-imports': [
             'json', 'sys', 'threading', 'traceback', 'pathlib', 'typing',
-            'flask', 'api_payloads', 'config', 'simulation', 'training',
+            'flask', 'web.api_payloads', 'config', 'runtime.simulation', 'ml.training',
             'doctest', 'python_ta'
         ],
         'allowed-io': [

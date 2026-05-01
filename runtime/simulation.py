@@ -17,11 +17,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from data_loader import DataLoader
-from event_stream import EventStream
-from matching_engine import MatchingEngine
-from neural_net import Agent, load_agent
-from order_book import OrderBook
+from data.data_loader import DataLoader
+from core.event_stream import EventStream
+from core.matching_engine import MatchingEngine
+from ml.neural_net import Agent, load_agent
+from core.order_book import OrderBook
 
 from config import (
     LOG_PATH,
@@ -199,8 +199,8 @@ if __name__ == '__main__':
 
     python_ta.check_all(config={
         'extra-imports': [
-            'dataclasses', 'data_loader', 'event_stream', 'matching_engine',
-            'neural_net', 'order_book', 'config', 'doctest', 'python_ta'
+            'dataclasses', 'data.data_loader', 'core.event_stream', 'core.matching_engine',
+            'ml.neural_net', 'core.order_book', 'config', 'doctest', 'python_ta'
         ],
         'allowed-io': ['print_summary', 'run_simulation_from_config'],
         'max-line-length': 120

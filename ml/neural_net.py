@@ -26,8 +26,8 @@ import torch
 from torch import Tensor, nn, optim
 from torch.utils.data import DataLoader
 
-from data_loader import DataLoader as QuantyzeDataLoader
-from order_book import OrderBook
+from data.data_loader import DataLoader as QuantyzeDataLoader
+from core.order_book import OrderBook
 
 
 def normalize_feature_vector(
@@ -438,7 +438,7 @@ if __name__ == '__main__':
     python_ta.check_all(config={
         'extra-imports': [
             'dataclasses', 'os', 'warnings', 'numpy', 'torch',
-            'torch.utils.data', 'data_loader', 'order_book', 'doctest', 'python_ta'
+            'torch.utils.data', 'data.data_loader', 'core.order_book', 'doctest', 'python_ta'
         ],
         'allowed-io': [
             '_load_checkpoint_payload', 'Trainer.save', 'Trainer.load',

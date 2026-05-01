@@ -17,8 +17,8 @@ Sahand Samadirand
 from datetime import datetime
 import time
 
-from orders import Event
-from matching_engine import MatchingEngine
+from core.orders import Event
+from core.matching_engine import MatchingEngine
 
 
 class EventStream:
@@ -85,7 +85,7 @@ class EventStream:
     def run_all(self) -> None:
         """Process each event in this stream's source until exhausted or stopped.
 
-        >>> from order_book import OrderBook
+        >>> from core.order_book import OrderBook
         >>> events = [Event(datetime(2026, 1, 1, 9, 30), 'b1', 'buy', 'limit', 99.0, 1.0)]
         >>> stream = EventStream(events, MatchingEngine(OrderBook()))
         >>> stream.run_all()
@@ -116,7 +116,7 @@ if __name__ == '__main__':
     doctest.testmod()
 
     python_ta.check_all(config={
-        'extra-imports': ['datetime', 'time', 'orders', 'matching_engine', 'doctest', 'python_ta'],
+        'extra-imports': ['datetime', 'time', 'core.orders', 'core.matching_engine', 'doctest', 'python_ta'],
         'allowed-io': [],
         'max-line-length': 120
     })

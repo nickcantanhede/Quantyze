@@ -21,7 +21,7 @@ Sahand Samadirand
 
 from __future__ import annotations
 
-from orders import Order
+from core.orders import Order
 
 
 class _Node:
@@ -198,7 +198,7 @@ class PriceLevel:
         """Pop and return the earliest order; decrement volume by its remaining_qty.
 
         >>> from datetime import datetime
-        >>> from orders import Event
+        >>> from core.orders import Event
         >>> level = PriceLevel(100.0)
         >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30), 'a1', 'sell', 'limit', 100.0, 2.0)))
         >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30, 1), 'a2', 'sell', 'limit', 100.0, 3.0)))
@@ -221,7 +221,7 @@ class PriceLevel:
         """Remove the order for ``order_id`` anywhere in the queue; adjust volume.
 
         >>> from datetime import datetime
-        >>> from orders import Event
+        >>> from core.orders import Event
         >>> level = PriceLevel(100.0)
         >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30), 'a1', 'sell', 'limit', 100.0, 2.0)))
         >>> level.add_order(Order(Event(datetime(2026, 1, 1, 9, 30, 1), 'a2', 'sell', 'limit', 100.0, 3.0)))
@@ -289,7 +289,7 @@ if __name__ == '__main__':
     doctest.testmod()
 
     python_ta.check_all(config={
-        'extra-imports': ['orders', 'doctest', 'python_ta'],
+        'extra-imports': ['core.orders', 'doctest', 'python_ta'],
         'allowed-io': [],
         'max-line-length': 120
     })
