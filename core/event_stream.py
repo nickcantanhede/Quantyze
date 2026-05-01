@@ -10,8 +10,7 @@ event emission.
 Copyright Information
 ===============================
 
-Copyright (c) 2026 Cade McNelly, Nicolas Miranda Cantanhede,
-Sahand Samadirand
+Copyright (c) 2026 Nicolas Miranda Cantanhede
 """
 
 from datetime import datetime
