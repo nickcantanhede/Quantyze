@@ -125,4 +125,3 @@ def _source_format(loader: DataLoader | None) -> str:
         return "unknown"
     else:
         return loader.source_format
-
